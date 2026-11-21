@@ -35,6 +35,75 @@ const CREATOR_KEYS: Record<ShelfKind, string[]> = {
   music: ['歌手', '作者', 'artist'],
 }
 
+/**
+ * Every field's spellings, Chinese first.
+ *
+ * The theme accepts a shelf written in English — `year: 1960` means what
+ * `年份：1960` means — and until these aliases existed the panel read an English
+ * block's year, note and cover as empty strings. That is worse than it sounds:
+ * the edit form would show blank fields, and an unchanged save would then drop
+ * those lines from the file.
+ */
+const FIELD_KEYS: Record<string, string[]> = {
+  '年份': ['年份', 'year'],
+  '豆瓣': ['豆瓣', 'douban'],
+  '封面': ['封面', 'cover'],
+  '一句话': ['一句话', 'note'],
+  '链接': ['链接', 'link', 'url'],
+}
+
+/** The spelling to write when a block is written in English. */
+const FIELD_KEYS_EN: Record<string, string> = {
+  // Title and creator are per-kind, and their English spelling is the same for
+  // all three — `title` / `author`, `director`, `artist` — but the canonical
+  // name the form sends is the one the kind's own file documents.
+  '书名': 'title',
+  '片名': 'title',
+  '名称': 'title',
+  '作者': 'author',
+  '导演': 'director',
+  '歌手': 'artist',
+  '年份': 'year',
+  '豆瓣': 'douban',
+  '封面': 'cover',
+  '一句话': 'note',
+  '链接': 'link',
+}
+
+/** Which spelling a canonical field name should be read from, in order. */
+function spellingsOf(canonical: string, kind: ShelfKind): string[] {
+  const titleKey = FIELD_ORDER[kind][0]
+  const creatorKey = FIELD_ORDER[kind][1]
+  if (canonical === titleKey) return TITLE_KEYS[kind]
+  if (canonical === creatorKey) return CREATOR_KEYS[kind]
+  return FIELD_KEYS[canonical] ?? [canonical]
+}
+
+/** The first spelling the block actually uses for this field, or `''`. */
+function fieldValue(fields: Record<string, string>, canonical: string, kind: ShelfKind): string {
+  for (const key of spellingsOf(canonical, kind)) {
+    const value = fields[key]
+    if (value) return value
+  }
+  return ''
+}
+
+/**
+ * Whether a block writes its keys in English.
+ *
+ * A block with any CJK key is Chinese; one written entirely in ASCII keys is
+ * English. A block with no keys at all has nothing to go on, and gets Chinese,
+ * which is what the theme's own files use.
+ */
+function blockLanguage(block: string): 'zh' | 'en' {
+  const keys = block
+    .split(/\r\n|\n/)
+    .map(line => line.match(LINE_RE)?.[2]?.trim() ?? '')
+    .filter(Boolean)
+  if (!keys.length) return 'zh'
+  return keys.some(key => /[\u4e00-\u9fa5]/.test(key)) ? 'zh' : 'en'
+}
+
 const LINE_RE = /^(\s*([^：:]{1,8})\s*[：:]\s*)(.+?)(\s*)$/
 
 export interface ShelfEntry {
@@ -126,11 +195,11 @@ export function shelfEntriesOf(text: string, kind: ShelfKind): ShelfEntry[] {
       kind,
       title,
       creator: firstOf(fields, CREATOR_KEYS[kind]),
-      year: fields['年份'] ?? '',
-      note: fields['一句话'] ?? '',
-      douban: fields['豆瓣'] ?? '',
-      link: fields['链接'] ?? '',
-      cover: fields['封面'] ?? '',
+      year: fieldValue(fields, '年份', kind),
+      note: fieldValue(fields, '一句话', kind),
+      douban: fieldValue(fields, '豆瓣', kind),
+      link: fieldValue(fields, '链接', kind),
+      cover: fieldValue(fields, '封面', kind),
       fields,
       lines: block,
       start,
@@ -147,20 +216,49 @@ export function shelfEntriesOf(text: string, kind: ShelfKind): ShelfEntry[] {
  * value — a field the author did not fill in is left out rather than written
  * as `作者：`. The line ending follows the file.
  */
-export function serializeShelfEntry(entry: Partial<Record<string, string>>, kind: ShelfKind): string {
+export function serializeShelfEntry(
+  entry: Partial<Record<string, string>>,
+  kind: ShelfKind,
+  language: 'zh' | 'en' = 'zh',
+  /** The order the block already had, so a re-save does not reorder it. */
+  existingOrder: string[] = [],
+): string {
+  /** The key to write: the English spelling for an English block, else Chinese. */
+  const written = (canonical: string): string =>
+    (language === 'en' ? FIELD_KEYS_EN[canonical] : undefined) ?? canonical
+  const separator = language === 'en' ? ': ' : '：'
+
+  /*
+   * An existing block keeps its own field order.
+   *
+   * The theme's documented order is Chinese (`封面` before `一句话`), but a file
+   * written in English may put `note` before `cover` — and re-ordering it on
+   * save would turn an unchanged entry into a diff. The documented order is
+   * only the default for a block that has none yet.
+   */
+  const modelled = FIELD_ORDER[kind]
+  const ordered: string[] = []
+  for (const key of existingOrder) {
+    const canonical = modelled.find(name => spellingsOf(name, kind).includes(key))
+    if (canonical && !ordered.includes(canonical)) ordered.push(canonical)
+  }
+  for (const key of modelled) {
+    if (!ordered.includes(key)) ordered.push(key)
+  }
+
   const lines: string[] = []
-  for (const key of FIELD_ORDER[kind]) {
+  for (const key of ordered) {
     const value = String(entry[key] ?? '').trim()
     if (!value) continue
-    lines.push(`${key}：${value}`)
+    lines.push(`${written(key)}${separator}${value}`)
   }
   // Any key outside the documented order keeps its place after the known ones,
   // so a field another tool wrote is not dropped.
   for (const [key, value] of Object.entries(entry)) {
-    if (FIELD_ORDER[kind].includes(key)) continue
+    if (ordered.includes(key)) continue
     const text = String(value ?? '').trim()
     if (!text) continue
-    lines.push(`${key}：${text}`)
+    lines.push(`${key}${separator}${text}`)
   }
   return lines.join('\n')
 }
@@ -182,7 +280,6 @@ export function upsertShelfEntry(
   const eol = text.includes('\r\n') ? '\r\n' : '\n'
   const lines = text.split(/\r\n|\n/)
   const entries = shelfEntriesOf(text, kind)
-  const block = serializeShelfEntry(values, kind).split('\n')
 
   // Find the entry this write is about: the one the caller named, or — when it
   // did not name one — the entry whose title matches. Without the second case,
@@ -195,6 +292,19 @@ export function upsertShelfEntry(
     ? entries.find(entry => entry.title === original.title)
     : entries.find(entry => entry.title === title)
 
+  /*
+   * An existing block keeps the language it was written in.
+   *
+   * A shelf in English says `year: 1960`; rewriting it as `年份：1960` would
+   * leave the block half in each language and make `npm run covers` add a
+   * second field for the same thing. A new entry has no block to imitate, so
+   * it follows the file: English if the list already is.
+   */
+  const language: 'zh' | 'en' = target
+    ? blockLanguage(target.lines.join('\n'))
+    : (entries.length && entries.every(entry => blockLanguage(entry.lines.join('\n')) === 'en') ? 'en' : 'zh')
+  const block = serializeShelfEntry(values, kind, language).split('\n')
+
   if (target) {
     /*
      * A key the caller did not mention keeps its stored value.
@@ -206,12 +316,34 @@ export function upsertShelfEntry(
      * "leave it", and an empty string means "remove it", which is how the form
      * already expresses a cleared field.
      */
-    const merged: Record<string, string> = { ...target.fields }
+    /*
+     * Merge on canonical field names, not on spellings.
+     *
+     * `target.fields` holds whatever keys the file uses (`year` in an English
+     * block, `年份` in a Chinese one) while the form always sends the canonical
+     * Chinese names. Merging the two maps directly would put both spellings in
+     * the block and write the same field twice.
+     */
+    const merged: Record<string, string> = {}
+    for (const canonical of FIELD_ORDER[kind]) {
+      const existing = fieldValue(target.fields, canonical, kind)
+      if (existing) merged[canonical] = existing
+    }
+    // Anything outside the documented order — a field another tool wrote — is
+    // carried over as-is so it is not dropped.
+    for (const [key, value] of Object.entries(target.fields)) {
+      const isModelled = FIELD_ORDER[kind].some(canonical => spellingsOf(canonical, kind).includes(key))
+      if (!isModelled && value) merged[key] = value
+    }
     for (const [key, value] of Object.entries(values)) {
       if (value === undefined) continue
       merged[key] = String(value)
     }
-    lines.splice(target.start, target.lines.length, ...serializeShelfEntry(merged, kind).split('\n'))
+    // The block's own key order, so an unchanged save does not reorder it.
+    const order = target.lines
+      .map(line => line.match(LINE_RE)?.[2]?.trim() ?? '')
+      .filter(Boolean)
+    lines.splice(target.start, target.lines.length, ...serializeShelfEntry(merged, kind, language, order).split('\n'))
     return lines.join(eol)
   }
 
@@ -248,10 +380,32 @@ export function deleteShelfEntry(text: string, kind: ShelfKind, title: string): 
 // now.md — 「最近」: a label line and a credit line, not `键：值` fields.
 // ---------------------------------------------------------------------------
 
-const LABEL_KIND: Record<string, NowKind> = { 在读: 'book', 在看: 'film', 在听: 'music' }
+/**
+ * The three labels, in both languages.
+ *
+ * A site built in English writes `Listening：《City》` — the theme's own scripts
+ * accept both spellings — and the panel used to recognise only the Chinese
+ * ones, so an English 「最近」 read as three unreadable paragraphs.
+ */
+const LABEL_KIND: Record<string, NowKind> = {
+  在读: 'book', 在看: 'film', 在听: 'music',
+  Reading: 'book', Watching: 'film', Listening: 'music',
+}
+
+/** Which label to write for a kind, per language. */
+const LABEL_OF: Record<NowKind, { zh: string, en: string }> = {
+  book: { zh: '在读', en: 'Reading' },
+  film: { zh: '在看', en: 'Watching' },
+  music: { zh: '在听', en: 'Listening' },
+}
+
 const LINK_RE = /https?:\/\/\S+/
-const REFERENCE_RE = /^\s*(年份|豆瓣|链接)\s*[：:]/
-const LABEL_RE = /^([^：:]{1,4})\s*[：:]\s*(?:《(.+)》|(.+?))\s*$/
+// Reference lines may be written in English: `year: 2009` is the same line as
+// `年份：2009`, and reading it as the credit line would draw it as the creator.
+const REFERENCE_RE = /^\s*(年份|豆瓣|链接|year|douban|link)\s*[：:]/i
+// The label is short in Chinese (在听) and longer in English (Listening), so
+// the bound has to fit the longer spelling.
+const LABEL_RE = /^([^：:]{1,12})\s*[：:]\s*(?:《(.+)》|(.+?))\s*$/
 
 export interface NowEntry {
   kind: NowKind
@@ -287,8 +441,12 @@ export function nowEntriesOf(text: string): NowEntry[] {
     // creator would search Douban for an author named `年份：2012`.
     const second = block[1] ?? ''
     const credit = REFERENCE_RE.test(second) ? '' : second
-    const year = block.map(line => line.match(/^\s*年份\s*[：:]\s*(.+?)\s*$/)?.[1]).find(Boolean) ?? ''
-    const douban = block.map(line => line.match(/^\s*豆瓣\s*[：:]\s*(.+?)\s*$/)?.[1]).find(Boolean) ?? ''
+    const year = block
+      .map(line => line.match(/^\s*(?:年份|year)\s*[：:]\s*(.+?)\s*$/i)?.[1])
+      .find(Boolean) ?? ''
+    const douban = block
+      .map(line => line.match(/^\s*(?:豆瓣|douban)\s*[：:]\s*(.+?)\s*$/i)?.[1])
+      .find(Boolean) ?? ''
 
     found.push({
       start,
@@ -323,12 +481,38 @@ export function serializeNowEntry(entry: {
   url: string
   year: string
   douban: string
-}, kind: NowKind): string[] {
+}, kind: NowKind, language: 'zh' | 'en' = 'zh'): string[] {
+  /*
+   * An English 「最近」 is written in English throughout.
+   *
+   * `Listening：《City》` plus `年份：2009` would be one block in two languages,
+   * and the theme's own script would then treat the two year lines as two
+   * different things. The label the caller passed is honoured when it is the
+   * other language's spelling — a block that says `Listening` keeps saying it.
+   */
+  /*
+   * The label line keeps the theme's punctuation in either language.
+   *
+   * The theme's own English sample reads `Listening：《City》` — the label is
+   * translated, the 《》 and the full-width colon are not. Only the field keys
+   * below it become English (`year：` rather than `年份：`).
+   */
+  const label = entry.label.trim() || LABEL_OF[kind][language]
+  const separator = '：'
+  const end = '》'
+  const start = '《'
   const credit = [entry.creator.trim(), entry.url.trim()].filter(Boolean).join(' ')
-  const lines = [`${entry.label}：《${entry.title.trim()}》`]
+  const lines = [`${label}${separator}${start}${entry.title.trim()}${end}`]
   if (credit) lines.push(credit)
-  if (entry.year.trim()) lines.push(`年份：${entry.year.trim()}`)
-  if (kind === 'music' && entry.douban.trim()) lines.push(`豆瓣：${entry.douban.trim()}`)
+  // A reference line reads `year：2009` in English and `年份：2009` in Chinese;
+  // the colon stays full-width, as in the theme's own files.
+  const refSeparator = '：'
+  if (entry.year.trim()) {
+    lines.push(`${language === 'en' ? 'year' : '年份'}${refSeparator}${entry.year.trim()}`)
+  }
+  if (kind === 'music' && entry.douban.trim()) {
+    lines.push(`${language === 'en' ? 'douban' : '豆瓣'}${refSeparator}${entry.douban.trim()}`)
+  }
   return lines
 }
 
@@ -340,17 +524,29 @@ export function upsertNowEntry(
 ): string {
   const eol = text.includes('\r\n') ? '\r\n' : '\n'
   const lines = text.split(/\r\n|\n/)
-  const block = serializeNowEntry(values, kind)
   const target = original
     ? nowEntriesOf(text).find(entry => entry.title === original.title)
     : nowEntriesOf(text).find(entry => entry.kind === kind)
+
+  /*
+   * An existing entry keeps its language; a new one follows the file.
+   *
+   * The label is the tell: `Listening` is English, `在听` is Chinese. Writing a
+   * new entry into an English file with a Chinese label would leave the column
+   * half translated.
+   */
+  const isEnglishLabel = (label: string): boolean => /^[\x20-\x7e]+$/.test(label)
+  const all = nowEntriesOf(text)
+  const language: 'zh' | 'en' = target
+    ? (isEnglishLabel(target.label) ? 'en' : 'zh')
+    : (all.length && all.every(entry => isEnglishLabel(entry.label)) ? 'en' : 'zh')
+  const block = serializeNowEntry(values, kind, language)
 
   if (target) {
     lines.splice(target.start, target.lines.length, ...block)
     return lines.join(eol)
   }
 
-  const all = nowEntriesOf(text)
   const last = all.at(-1)
   if (last) {
     lines.splice(last.start + last.lines.length, 0, '', ...block)
