@@ -24,7 +24,7 @@ export interface Site {
   repo: string
   branch: string
   paths: SitePaths
-  /** Where the built site is served — `https://liff.cc`. Media lives here. */
+  /** Where the built site is served — e.g. `https://example.com`. Media lives here. */
   publicUrl: string
   enabled: boolean
   createdAt: string
@@ -87,7 +87,7 @@ export interface SiteInput {
   branch: string
   paths?: Partial<SitePaths>
   patRef?: string
-  /** The published site, e.g. `https://liff.cc`. Must be https or empty. */
+  /** The published site, e.g. `https://example.com`. Must be https or empty. */
   publicUrl?: string
 }
 
@@ -134,7 +134,7 @@ export function validateSiteInput(input: SiteInput): SiteInput {
       parsed = new URL(publicUrl)
     }
     catch {
-      throw new SiteError('SITE_URL', '站点地址不是完整的网址，例如 https://liff.cc')
+      throw new SiteError('SITE_URL', '站点地址不是完整的网址，例如 https://example.com')
     }
     if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
       throw new SiteError('SITE_URL', '站点地址只能是 http(s)')

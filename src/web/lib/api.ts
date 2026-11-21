@@ -280,7 +280,7 @@ export interface Site {
   repo: string
   branch: string
   paths: Record<string, string>
-  /** The published site, e.g. https://liff.cc — where media is served. */
+  /** The published site, e.g. https://example.com — where media is served. */
   publicUrl: string
   enabled: boolean
   createdAt: string

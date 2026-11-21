@@ -240,11 +240,11 @@ function SiteDialog({
         <div class="meta-grid">
           <label class="field">
             <span class="label">{t('sites.owner')}</span>
-            <input class="input mono" value={owner} onInput={event => setOwner((event.target as HTMLInputElement).value)} placeholder="leefanfan1" />
+            <input class="input mono" value={owner} onInput={event => setOwner((event.target as HTMLInputElement).value)} placeholder="your-github-name" />
           </label>
           <label class="field">
             <span class="label">{t('sites.repo')}</span>
-            <input class="input mono" value={repo} onInput={event => setRepo((event.target as HTMLInputElement).value)} placeholder="cijianfanfan" />
+            <input class="input mono" value={repo} onInput={event => setRepo((event.target as HTMLInputElement).value)} placeholder="your-repo" />
           </label>
           <label class="field">
             <span class="label">{t('sites.branch')}</span>
@@ -255,7 +255,7 @@ function SiteDialog({
             <input
               class="input mono"
               value={publicUrl}
-              placeholder="https://liff.cc"
+              placeholder="https://example.com"
               onInput={event => setPublicUrl((event.target as HTMLInputElement).value)}
             />
             <span class="hint">{t('sites.publicUrlHint')}</span>
