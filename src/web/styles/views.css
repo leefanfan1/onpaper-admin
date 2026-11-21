@@ -126,6 +126,12 @@
 
 /* The language badge, shown only on a site that mixes languages. Small and
    quiet: it is a fact about the file, not a status the editor acts on. */
+/* The count beside a shelf tab's name. A margin, not a space — see the note in
+   shelf.tsx. */
+.shelf-count {
+  margin-inline-start: 0.4em;
+}
+
 .ledger__lang {
   margin-inline-start: var(--space-2);
   font-size: 0.68rem;

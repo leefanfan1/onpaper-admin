@@ -1,5 +1,5 @@
 /**
- * 页面与友链.
+ * Pages and friend links.
  *
  * Three files, three editors. `about.md` and `now.md` are Markdown with a body;
  * `friends.md` is a list of name/URL/description triples that the site parses
@@ -14,13 +14,14 @@ import type { AppContext } from '../app'
 import { PageHead } from '../app'
 import { Empty, ErrorBox, useConfirm } from '../components/ui'
 import { SkeletonRows } from '../components/feedback'
+import { useT } from '../lib/i18n'
 
 type PageKey = 'about' | 'now' | 'friends'
 
-const PAGE_LABELS: Record<PageKey, string> = {
-  about: '关于',
-  now: '最近',
-  friends: '友链',
+const PAGE_LABEL_KEYS: Record<PageKey, 'pages.about' | 'pages.now' | 'pages.friends'> = {
+  about: 'pages.about',
+  now: 'pages.now',
+  friends: 'pages.friends',
 }
 
 interface PagePayload {
@@ -52,6 +53,7 @@ interface FriendLink {
 }
 
 export function PagesView({ ctx, siteId }: { ctx: AppContext, siteId: number }): ComponentChildren {
+  const { t } = useT()
   const [page, setPage] = useState<PageKey>('about')
   const [data, setData] = useState<PagePayload | null>(null)
   const [error, setError] = useState<Error | null>(null)
@@ -73,12 +75,12 @@ export function PagesView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
   return (
     <div class="stack">
       <PageHead
-        title="页面与友链"
-        description="关于页、右栏「最近」、友链列表。改动会直接提交到仓库。"
+        title={t('pages.title')}
+        description={t('pages.subtitle')}
       />
 
-      <nav class="subtabs" aria-label="页面">
-        {(Object.keys(PAGE_LABELS) as PageKey[]).map(key => (
+      <nav class="subtabs" aria-label={t('pages.aria')}>
+        {(Object.keys(PAGE_LABEL_KEYS) as PageKey[]).map(key => (
           <button
             key={key}
             type="button"
@@ -86,7 +88,7 @@ export function PagesView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
             aria-current={page === key ? 'page' : undefined}
             onClick={() => setPage(key)}
           >
-            {PAGE_LABELS[key]}
+            {t(PAGE_LABEL_KEYS[key])}
           </button>
         ))}
       </nav>
@@ -96,7 +98,7 @@ export function PagesView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
           their space, so only the editor area waits — and it waits in place. */}
       {!error && !data && <SkeletonRows rows={5} />}
       {data && !data.exists && (
-        <Empty title={`还没有 ${PAGE_LABELS[page]} 页`}>
+        <Empty title={t('pages.notYet', t(PAGE_LABEL_KEYS[page]))}>
           <button
             type="button"
             class="btn btn--primary"
@@ -104,14 +106,14 @@ export function PagesView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
               try {
                 await api.post(`/api/sites/${siteId}/pages/${page}`, {})
                 await load(page)
-                ctx.toast('ok', '页面已创建')
+                ctx.toast('ok', t('pages.created'))
               }
               catch (caught) {
                 ctx.toast('danger', isApiError(caught) ? caught.message : String(caught))
               }
             }}
           >
-            创建页面
+            {t('pages.create')}
           </button>
         </Empty>
       )}
@@ -167,6 +169,7 @@ function MarkdownPage({
   saving: boolean
   setSaving: (value: boolean) => void
 }): ComponentChildren {
+  const { t } = useT()
   const [title, setTitle] = useState(data.frontmatter?.title ?? '')
   const [description, setDescription] = useState(data.frontmatter?.description ?? '')
   const [body, setBody] = useState(data.body ?? '')
@@ -186,7 +189,7 @@ function MarkdownPage({
         frontmatter: { ...(data.frontmatter ?? {}), title, description },
         body,
       })
-      toast('ok', '已保存')
+      toast('ok', t('common.saved'))
       onSaved()
     }
     catch (caught) {
@@ -201,27 +204,27 @@ function MarkdownPage({
     <div class="stack">
       <div class="meta-grid">
         <label class="field">
-          <span class="label">标题</span>
+          <span class="label">{t('pages.title')}</span>
           <input class="input" value={title} onInput={event => setTitle((event.target as HTMLInputElement).value)} />
         </label>
         <label class="field">
-          <span class="label">描述</span>
+          <span class="label">{t('pages.description')}</span>
           <input class="input" value={description} onInput={event => setDescription((event.target as HTMLInputElement).value)} />
         </label>
       </div>
       <label class="field">
-        <span class="label">正文（Markdown）</span>
+        <span class="label">{t('pages.body')}</span>
         <textarea
           class="textarea editor-textarea"
           rows={22}
           value={body}
           onInput={event => setBody((event.target as HTMLTextAreaElement).value)}
         />
-        <span class="hint">{'文件开头的 <!-- --> 注释会原样保留在文件里。'}</span>
+        <span class="hint">{t('pages.bodyHint')}</span>
       </label>
       <div class="row">
         <button type="button" class="btn btn--primary" disabled={busy} onClick={() => void save()}>
-          {busy ? '保存中…' : '保存'}
+          {busy ? t('common.saving') : t('common.save')}
         </button>
       </div>
     </div>
@@ -241,6 +244,7 @@ function NowEditor({
   onSaved: () => void
   toast: AppContext['toast']
 }): ComponentChildren {
+  const { t } = useT()
   const [rows, setRows] = useState<NowEntry[]>(entries)
   const [busy, setBusy] = useState(false)
 
@@ -256,7 +260,7 @@ function NowEditor({
       await api.put(`/api/sites/${siteId}/pages/now`, {
         entries: rows.map(row => ({ ...row, originalTitle: entries.find(entry => entry.kind === row.kind)?.title })),
       })
-      toast('ok', '已保存')
+      toast('ok', t('common.saved'))
       onSaved()
     }
     catch (caught) {
@@ -270,36 +274,36 @@ function NowEditor({
   return (
     <div class="stack">
       <p class="hint">
-        首页右栏的三行。在读、在看填豆瓣条目页；在听填音乐平台。
-        <code class="mono">npm run covers</code> 能按名称补齐作者、年份和链接。
+        {t('pages.nowHelp')}
+        <code class="mono">npm run covers</code>
       </p>
       {rows.map((row, index) => (
         <fieldset key={row.kind} class="fieldset">
           <legend>{row.label}</legend>
           <div class="meta-grid">
             <label class="field">
-              <span class="label">名称</span>
+              <span class="label">{t('pages.name')}</span>
               <input class="input" value={row.title} onInput={event => update(index, { title: (event.target as HTMLInputElement).value })} />
             </label>
             <label class="field">
-              <span class="label">{row.kind === 'music' ? '歌手' : '作者'}</span>
+              <span class="label">{t('pages.creator')}</span>
               <input class="input" value={row.creator} onInput={event => update(index, { creator: (event.target as HTMLInputElement).value })} />
             </label>
             <label class="field meta-grid__wide">
-              <span class="label">链接</span>
+              <span class="label">{t('pages.link')}</span>
               <input class="input mono" value={row.url} onInput={event => update(index, { url: (event.target as HTMLInputElement).value })} />
             </label>
             <label class="field">
-              <span class="label">年份</span>
+              <span class="label">{t('pages.year')}</span>
               <input class="input" value={row.year} onInput={event => update(index, { year: (event.target as HTMLInputElement).value })} />
             </label>
           </div>
         </fieldset>
       ))}
-      {!rows.length && <Empty title="还没有「最近」条目">在文件里写第一段，或用 covers 补全。</Empty>}
+      {!rows.length && <Empty title={t('pages.nowEmpty')}>{t('pages.nowEmptyHint')}</Empty>}
       <div class="row">
         <button type="button" class="btn btn--primary" disabled={busy || !rows.length} onClick={() => void save()}>
-          {busy ? '保存中…' : '保存'}
+          {busy ? t('common.saving') : t('common.save')}
         </button>
       </div>
     </div>
@@ -321,6 +325,7 @@ function FriendsEditor({
   onSaved: () => void
   toast: AppContext['toast']
 }): ComponentChildren {
+  const { t } = useT()
   const [links, setLinks] = useState<FriendLink[]>(initial)
   const [busy, setBusy] = useState(false)
   const [confirmElement, confirm] = useConfirm()
@@ -345,7 +350,7 @@ function FriendsEditor({
     setBusy(true)
     try {
       await api.put(`/api/sites/${siteId}/pages/friends`, { links })
-      toast('ok', '已保存')
+      toast('ok', t('common.saved'))
       onSaved()
     }
     catch (caught) {
@@ -359,9 +364,9 @@ function FriendsEditor({
   const remove = async (index: number) => {
     const link = links[index]
     const ok = await confirm({
-      title: `移除「${link.name}」？`,
-      message: '会从这个文件里删掉这三行。',
-      confirmLabel: '移除',
+      title: t('pages.removeTitle', link.name),
+      message: t('pages.removeBody'),
+      confirmLabel: t('common.remove'),
       danger: true,
     })
     if (!ok) return
@@ -372,40 +377,40 @@ function FriendsEditor({
     <div class="stack">
       {parseError && (
         <div class="notice notice--warn" role="alert">
-          <p>文件现在的格式有问题，面板读不全：{parseError}</p>
+          <p>{t('pages.parseError', parseError)}</p>
         </div>
       )}
       <div class="stack">
         {links.map((link, index) => (
           <div key={`${link.url}-${index}`} class="friend-row">
             <div class="friend-row__order">
-              <button type="button" class="btn btn--ghost btn--sm" aria-label={`上移 ${link.name}`} onClick={() => move(index, -1)}>↑</button>
-              <button type="button" class="btn btn--ghost btn--sm" aria-label={`下移 ${link.name}`} onClick={() => move(index, 1)}>↓</button>
+              <button type="button" class="btn btn--ghost btn--sm" aria-label={t('pages.moveUp', link.name)} onClick={() => move(index, -1)}>↑</button>
+              <button type="button" class="btn btn--ghost btn--sm" aria-label={t('pages.moveDown', link.name)} onClick={() => move(index, 1)}>↓</button>
             </div>
             <div class="friend-row__fields">
               <input
                 class="input"
-                aria-label="名称"
-                placeholder="名称"
+                aria-label={t('pages.name')}
+                placeholder={t('pages.name')}
                 value={link.name}
                 onInput={event => update(index, { name: (event.target as HTMLInputElement).value })}
               />
               <input
                 class="input mono"
-                aria-label="网址"
+                aria-label={t('pages.url')}
                 placeholder="https://example.com/"
                 value={link.url}
                 onInput={event => update(index, { url: (event.target as HTMLInputElement).value })}
               />
               <input
                 class="input"
-                aria-label="简介"
-                placeholder="一段简短的介绍（可省略）"
+                aria-label={t('pages.note')}
+                placeholder={t('pages.notePlaceholder')}
                 value={link.description}
                 onInput={event => update(index, { description: (event.target as HTMLInputElement).value })}
               />
             </div>
-            <button type="button" class="btn btn--sm btn--danger" onClick={() => void remove(index)}>移除</button>
+            <button type="button" class="btn btn--sm btn--danger" onClick={() => void remove(index)}>{t('common.remove')}</button>
           </div>
         ))}
       </div>
@@ -416,10 +421,10 @@ function FriendsEditor({
           class="btn"
           onClick={() => setLinks(current => [...current, { name: '', url: 'https://', description: '' }])}
         >
-          添加一位
+          {t('pages.addFriend')}
         </button>
         <button type="button" class="btn btn--primary" disabled={busy} onClick={() => void save()}>
-          {busy ? '保存中…' : '保存'}
+          {busy ? t('common.saving') : t('common.save')}
         </button>
       </div>
 

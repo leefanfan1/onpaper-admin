@@ -6,7 +6,7 @@
  * navigation, and the current section can scroll out of view. The panel's real
  * job on a phone is a handful of frequent actions — read the list, write, run a
  * task, change a setting — so those get a fixed bottom bar, and the rest lives
- * behind 更多.
+ * behind a "More" sheet.
  *
  * The bar is portalled to `document.body` rather than rendered in place. A
  * `position: fixed` element is anchored to the nearest ancestor that establishes
@@ -33,11 +33,20 @@ export function BottomBar({
   items,
   more,
   current,
+  moreLabel = 'More',
+  sectionsLabel = 'Sections',
+  currentLabel = 'Current',
+  closeLabel = 'Close',
 }: {
   items: NavItem[]
   more: NavItem[]
   /** The route key that should read as current, or '' when none does. */
   current: string
+  /** The word on the button that opens the sheet. */
+  moreLabel?: string
+  sectionsLabel?: string
+  currentLabel?: string
+  closeLabel?: string
 }): ComponentChildren {
   const [open, setOpen] = useState(false)
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
@@ -60,7 +69,7 @@ export function BottomBar({
 
   const content = (
     <>
-      <nav class="bottombar" aria-label="分区">
+      <nav class="bottombar" aria-label={sectionsLabel}>
         {items.map(item => (
           <a
             key={item.key}
@@ -81,7 +90,7 @@ export function BottomBar({
           onClick={() => setOpen(true)}
         >
           <span class="bottombar__glyph" aria-hidden="true">⋯</span>
-          <span class="bottombar__label">更多</span>
+          <span class="bottombar__label">{moreLabel}</span>
         </button>
       </nav>
 
@@ -95,7 +104,7 @@ export function BottomBar({
         {open && (
           <div class="sheet__body">
             <div class="sheet__grab" aria-hidden="true" />
-            <h2 id="sheet-title" class="sheet__title">更多</h2>
+            <h2 id="sheet-title" class="sheet__title">{moreLabel}</h2>
             <ul class="sheet__list">
               {more.map(item => (
                 <li key={item.key}>
@@ -107,13 +116,13 @@ export function BottomBar({
                   >
                     <span class="sheet__glyph" aria-hidden="true">{item.glyph}</span>
                     <span>{item.label}</span>
-                    {current === item.key && <span class="mark mark--info">当前</span>}
+                    {current === item.key && <span class="mark mark--info">{currentLabel}</span>}
                   </a>
                 </li>
               ))}
             </ul>
             <button type="button" class="btn sheet__close" onClick={() => setOpen(false)}>
-              关闭
+              {closeLabel}
             </button>
           </div>
         )}

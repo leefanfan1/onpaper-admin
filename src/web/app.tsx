@@ -6,12 +6,15 @@
  * tabs are the six jobs a person actually does here.
  */
 
-import { useEffect, useState } from 'preact/hooks'
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 import type { ComponentChildren } from 'preact'
-import { api, bootstrap, isApiError, prefetch, warmSite, type Health, type Site } from './lib/api'
+import { api, bootstrap, isApiError, prefetch, setErrorTranslator, warmSite, type Health, type Site } from './lib/api'
 import { hrefOf, navigate, parseRoute, useRoute, type Route } from './lib/router'
 import { ErrorBox, Loading, ToastStack, useToasts } from './components/ui'
 import { BottomBar } from './components/bottom-bar'
+import {
+  I18nContext, detectLang, rememberLang, translator, type Dictionary, type Lang,
+} from './lib/i18n'
 import { OverviewView } from './views/overview'
 import { PostsView } from './views/posts'
 import { PostEditorView } from './views/post-editor'
@@ -31,36 +34,39 @@ export interface AppContext {
   site: Site | null
   reload: () => Promise<void>
   toast: (tone: 'ok' | 'warn' | 'danger' | 'info', message: string) => void
+  /** The reader's language, and the translator for it. */
+  lang: Lang
+  t: (key: keyof Dictionary, ...args: unknown[]) => string
 }
 
-const TABS: Array<{ key: string, label: string, route: (siteId: number) => Route }> = [
-  { key: 'posts', label: '文章', route: siteId => ({ name: 'posts', siteId }) },
-  { key: 'pages', label: '页面与友链', route: siteId => ({ name: 'pages', siteId }) },
-  { key: 'shelf', label: '书架', route: siteId => ({ name: 'shelf', siteId }) },
-  { key: 'config', label: '站点配置', route: siteId => ({ name: 'config', siteId }) },
-  { key: 'media', label: '媒体', route: siteId => ({ name: 'media', siteId }) },
-  { key: 'tasks', label: '任务', route: siteId => ({ name: 'tasks', siteId }) },
-  { key: 'history', label: '提交', route: siteId => ({ name: 'history', siteId }) },
-  { key: 'audit', label: '审计', route: siteId => ({ name: 'audit', siteId }) },
+const TABS: Array<{ key: string, labelKey: keyof Dictionary, route: (siteId: number) => Route }> = [
+  { key: 'posts', labelKey: 'nav.posts', route: siteId => ({ name: 'posts', siteId }) },
+  { key: 'pages', labelKey: 'nav.pages', route: siteId => ({ name: 'pages', siteId }) },
+  { key: 'shelf', labelKey: 'nav.shelf', route: siteId => ({ name: 'shelf', siteId }) },
+  { key: 'config', labelKey: 'nav.config', route: siteId => ({ name: 'config', siteId }) },
+  { key: 'media', labelKey: 'nav.media', route: siteId => ({ name: 'media', siteId }) },
+  { key: 'tasks', labelKey: 'nav.tasks', route: siteId => ({ name: 'tasks', siteId }) },
+  { key: 'history', labelKey: 'nav.history', route: siteId => ({ name: 'history', siteId }) },
+  { key: 'audit', labelKey: 'nav.audit', route: siteId => ({ name: 'audit', siteId }) },
 ]
 
 /**
- * The phone bar shows the four jobs that are actually done on a phone, and the
- * rest live behind 更多. Deciding by frequency rather than by symmetry is what
- * makes the bar usable with a thumb.
+ * The phone bar shows the jobs actually done on a phone, and the rest live
+ * behind More. Deciding by frequency rather than by symmetry is what makes the
+ * bar usable with a thumb.
  */
-const PHONE_PRIMARY: Array<{ key: string, label: string, glyph: string, route: (siteId: number) => Route }> = [
-  { key: 'posts', label: '文章', glyph: '✎', route: siteId => ({ name: 'posts', siteId }) },
-  { key: 'shelf', label: '书架', glyph: '▤', route: siteId => ({ name: 'shelf', siteId }) },
-  { key: 'tasks', label: '任务', glyph: '⟳', route: siteId => ({ name: 'tasks', siteId }) },
+const PHONE_PRIMARY: Array<{ key: string, labelKey: keyof Dictionary, glyph: string, route: (siteId: number) => Route }> = [
+  { key: 'posts', labelKey: 'nav.posts', glyph: '✎', route: siteId => ({ name: 'posts', siteId }) },
+  { key: 'shelf', labelKey: 'nav.shelf', glyph: '▤', route: siteId => ({ name: 'shelf', siteId }) },
+  { key: 'tasks', labelKey: 'nav.tasks', glyph: '⟳', route: siteId => ({ name: 'tasks', siteId }) },
 ]
 
-const PHONE_MORE: Array<{ key: string, label: string, glyph: string, route: (siteId: number) => Route }> = [
-  { key: 'pages', label: '页面与友链', glyph: '▭', route: siteId => ({ name: 'pages', siteId }) },
-  { key: 'config', label: '站点配置', glyph: '⚙', route: siteId => ({ name: 'config', siteId }) },
-  { key: 'media', label: '媒体', glyph: '▣', route: siteId => ({ name: 'media', siteId }) },
-  { key: 'history', label: '提交', glyph: '⌘', route: siteId => ({ name: 'history', siteId }) },
-  { key: 'audit', label: '审计', glyph: '⊙', route: siteId => ({ name: 'audit', siteId }) },
+const PHONE_MORE: Array<{ key: string, labelKey: keyof Dictionary, glyph: string, route: (siteId: number) => Route }> = [
+  { key: 'pages', labelKey: 'nav.pages', glyph: '▭', route: siteId => ({ name: 'pages', siteId }) },
+  { key: 'config', labelKey: 'nav.config', glyph: '⚙', route: siteId => ({ name: 'config', siteId }) },
+  { key: 'media', labelKey: 'nav.media', glyph: '▣', route: siteId => ({ name: 'media', siteId }) },
+  { key: 'history', labelKey: 'nav.history', glyph: '⌘', route: siteId => ({ name: 'history', siteId }) },
+  { key: 'audit', labelKey: 'nav.audit', glyph: '⊙', route: siteId => ({ name: 'audit', siteId }) },
 ]
 
 export function App(): ComponentChildren {
@@ -69,7 +75,33 @@ export function App(): ComponentChildren {
   const [sites, setSites] = useState<Site[]>([])
   const [error, setError] = useState<Error | null>(null)
   const [loading, setLoading] = useState(true)
+  const [lang, setLang] = useState<Lang>(() => detectLang())
   const { toasts, push, dismiss } = useToasts()
+
+  const t = useMemo(() => translator(lang), [lang])
+
+  /*
+   * The language is a property of the session, not of the site.
+   *
+   * A site's `i18n.defaultLang` says what its pages are written in; a person
+   * editing an English site from a Chinese laptop should still read the panel
+   * in Chinese. So the browser decides (with a stored choice winning), and the
+   * top bar offers a switch. `lang` is also put on <html> so the document
+   * reports what it is — screen readers and spell checkers both read it.
+   */
+  const changeLang = useCallback((next: Lang) => {
+    setLang(next)
+    rememberLang(next)
+  }, [])
+  useEffect(() => {
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
+    // The API layer builds error messages before any component sees them, so it
+    // needs the current translator rather than a context.
+    setErrorTranslator(t)
+  }, [lang, t])
+  useEffect(() => {
+    document.title = t('app.name')
+  }, [lang, t])
 
   const load = async () => {
     setLoading(true)
@@ -134,7 +166,7 @@ export function App(): ComponentChildren {
   }
 
   if (loading) {
-    return <div class="boot"><Loading label="正在连接" /></div>
+    return <div class="boot"><Loading label={t('shell.connecting')} /></div>
   }
 
   if (error) {
@@ -143,10 +175,10 @@ export function App(): ComponentChildren {
         <ErrorBox error={error} onRetry={() => { void load() }} />
         <p class="hint">
           {isApiError(error) && error.code === 'CONFIG'
-            ? '面板还没有配置 Cloudflare Access：需要设置 ACCESS_TEAM_DOMAIN、ACCESS_AUD 和 PANEL_HOSTNAME。'
+            ? t('shell.needConfig')
             : isApiError(error) && error.status === 401
-              ? '请通过 Cloudflare Access 登录后再打开面板。'
-              : '检查网络或稍后重试。'}
+              ? t('shell.needAccess')
+              : t('shell.checkNetwork')}
         </p>
       </div>
     )
@@ -162,17 +194,38 @@ export function App(): ComponentChildren {
     site,
     reload: load,
     toast: push,
+    lang,
+    t,
   }
 
   return (
+    <I18nContext.Provider value={{ lang, t }}>
     <div class="shell">
-      <aside class="spine" aria-label="站点">
-        <a class="spine__title" href="#/" aria-label="回到总览">纸上管理</a>
+      <aside class="spine" aria-label={t('nav.aria.sites')}>
+        <a class="spine__title" href="#/" aria-label={t('nav.aria.backToOverview')}>{t('app.shortName')}</a>
         <div class="spine__actions">
+          {/*
+            The language switch. Two letters, not a globe or a flag: a flag names
+            a country and the panel's two languages are not two countries.
+          */}
+          {/*
+            The switch names the language it leads to, in that language — a
+            Chinese reader looking for English sees "English", and vice versa.
+            Both spellings live in the dictionary so neither is a literal here.
+          */}
+          <button
+            type="button"
+            class="spine__btn spine__lang"
+            aria-label={t(lang === 'zh' ? 'shell.switchToEn' : 'shell.switchToZh')}
+            title={t(lang === 'zh' ? 'shell.switchToEn' : 'shell.switchToZh')}
+            onClick={() => changeLang(lang === 'zh' ? 'en' : 'zh')}
+          >
+            {lang === 'zh' ? t('shell.langShortEn') : t('shell.langShortZh')}
+          </button>
           <button
             type="button"
             class="spine__btn"
-            aria-label="切换配色"
+            aria-label={t('nav.aria.theme')}
             onClick={() => {
               const current = document.documentElement.dataset.theme
               setTheme(current === 'dark' ? 'light' : current === 'light' ? 'auto' : 'dark')
@@ -180,8 +233,8 @@ export function App(): ComponentChildren {
           >
             ◐
           </button>
-          <a class="spine__btn" href="#/sites" aria-label="站点列表">▤</a>
-          <a class="spine__btn" href="#/users" aria-label="管理员">◯</a>
+          <a class="spine__btn" href="#/sites" aria-label={t('nav.aria.sites')}>▤</a>
+          <a class="spine__btn" href="#/users" aria-label={t('nav.aria.users')}>◯</a>
         </div>
       </aside>
 
@@ -194,7 +247,7 @@ export function App(): ComponentChildren {
                 <span class="topbar__repo">{site.owner}/{site.repo} · {site.branch}</span>
               </>
             ) : (
-              <span class="topbar__name">OnPaper 管理面板</span>
+              <span class="topbar__name">{t('shell.panelTitle')}</span>
             )}
           </div>
           <div class="topbar__spacer" />
@@ -212,7 +265,7 @@ export function App(): ComponentChildren {
             those pages were 44px shorter, so every navigation between them and
             a site page shifted the whole content area up or down — which reads
             as the layout jumping. */}
-        <nav class="tabs" aria-label={site ? '站点分区' : '位置'}>
+        <nav class="tabs" aria-label={site ? t('nav.aria.sections') : t('nav.aria.location')}>
           {site ? (
             TABS.map(tab => (
               <a
@@ -221,7 +274,7 @@ export function App(): ComponentChildren {
                 href={hrefOf(tab.route(site.id))}
                 aria-current={routeMatches(route, tab.key) ? 'page' : undefined}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </a>
             ))
           ) : (
@@ -231,21 +284,21 @@ export function App(): ComponentChildren {
                 href="#/"
                 aria-current={route.name === 'overview' ? 'page' : undefined}
               >
-                总览
+                {t('nav.overview')}
               </a>
               <a
                 class="tab"
                 href="#/sites"
                 aria-current={route.name === 'sites' ? 'page' : undefined}
               >
-                站点
+                {t('nav.sites')}
               </a>
               <a
                 class="tab"
                 href="#/users"
                 aria-current={route.name === 'users' ? 'page' : undefined}
               >
-                管理员
+                {t('nav.users')}
               </a>
             </>
           )}
@@ -255,25 +308,26 @@ export function App(): ComponentChildren {
             site list itself it offers a way back to the first site — without
             it those two screens were the ones with no navigation at all. */}
         <BottomBar
+          moreLabel={t('nav.more')}
           items={site ? PHONE_PRIMARY.map(tab => ({
             key: tab.key,
-            label: tab.label,
+            label: t(tab.labelKey),
             glyph: tab.glyph,
             route: tab.route(site.id),
           })) : sites.length ? PHONE_PRIMARY.map(tab => ({
             key: tab.key,
-            label: tab.label,
+            label: t(tab.labelKey),
             glyph: tab.glyph,
             route: tab.route(sites[0].id),
           })) : []}
           more={site ? PHONE_MORE.map(tab => ({
             key: tab.key,
-            label: tab.label,
+            label: t(tab.labelKey),
             glyph: tab.glyph,
             route: tab.route(site.id),
           })) : [
-            { key: 'sites', label: '站点', glyph: '▤', route: { name: 'sites' } as Route },
-            { key: 'users', label: '管理员', glyph: '◯', route: { name: 'users' } as Route },
+            { key: 'sites', label: t('nav.sites'), glyph: '▤', route: { name: 'sites' } as Route },
+            { key: 'users', label: t('nav.users'), glyph: '◯', route: { name: 'users' } as Route },
           ]}
           current={site ? (TABS.find(tab => routeMatches(route, tab.key))?.key ?? '') : route.name}
         />
@@ -285,6 +339,7 @@ export function App(): ComponentChildren {
 
       <ToastStack toasts={toasts} dismiss={dismiss} />
     </div>
+    </I18nContext.Provider>
   )
 }
 
@@ -303,7 +358,7 @@ function mostlyVisited(siteId: number): string[] {
     `${base}/tasks/meta`,
     `${base}/tasks`,
     `${base}/shelf`,
-    // The page editor asks for one page at a time and opens on 关于, so warming
+    // The page editor asks for one page at a time and opens on About, so warming
     // the list alone left its first visit the slowest screen in the panel.
     `${base}/pages/about`,
     `${base}/config`,

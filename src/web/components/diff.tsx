@@ -8,6 +8,7 @@
  */
 
 import type { ComponentChildren } from 'preact'
+import { useT } from '../lib/i18n'
 
 export interface DiffLine {
   kind: 'same' | 'add' | 'remove'
@@ -59,10 +60,11 @@ export function DiffPreview({ diff, renamed, path }: {
   renamed?: boolean
   path?: string
 }): ComponentChildren {
+  const { t } = useT()
   if (diff.truncated) {
     return (
       <p class="diff__note">
-        文件较大，这里只确认内容有变化。{path && <span class="mono">{path}</span>}
+        {t('diff.large')}{path && <span class="mono">{path}</span>}
       </p>
     )
   }
@@ -79,14 +81,14 @@ export function DiffPreview({ diff, renamed, path }: {
     <div class="diff">
       {renamed && path && (
         <p class="diff__note">
-          文件会被移动到 <span class="mono">{path}</span>（同一个提交里完成）
+          {t('diff.renamedBefore')}<span class="mono">{path}</span>{t('diff.renamedAfter')}
         </p>
       )}
       <ol class="diff__lines" role="list">
         {visible.map((line, index) => (
           line.kind === 'gap' ? (
-            <li key={index} class="diff__gap" aria-label={`省略 ${line.count} 行未变的内容`}>
-              ⋯ {line.count} 行未变
+            <li key={index} class="diff__gap" aria-label={t('diff.skippedAria', line.count)}>
+              ⋯ {t('diff.skipped', line.count)}
             </li>
           ) : (
             <li key={index} class={`diff__line diff__line--${line.kind}`}>
@@ -95,13 +97,13 @@ export function DiffPreview({ diff, renamed, path }: {
               </span>
               <span class="diff__text">{line.text || ' '}</span>
               <span class="sr-only">
-                {line.kind === 'add' ? '新增' : line.kind === 'remove' ? '删除' : '未变'}
+                {line.kind === 'add' ? t('diff.added') : line.kind === 'remove' ? t('diff.removed') : t('diff.same')}
               </span>
             </li>
           )
         ))}
         {wholeFileChanged && diff.lines.length > 80 && (
-          <li class="diff__gap">⋯ 还有 {diff.lines.length - 80} 行</li>
+          <li class="diff__gap">⋯ {t('diff.more', diff.lines.length - 80)}</li>
         )}
       </ol>
     </div>

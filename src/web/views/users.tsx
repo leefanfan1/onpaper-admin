@@ -13,6 +13,7 @@ import type { AppContext } from '../app'
 import { PageHead } from '../app'
 import { ErrorBox, Loading, formatDate, useConfirm } from '../components/ui'
 import { SkeletonRows } from '../components/feedback'
+import { useT } from '../lib/i18n'
 
 interface UserRow {
   email: string
@@ -22,6 +23,7 @@ interface UserRow {
 }
 
 export function UsersView({ ctx }: { ctx: AppContext }): ComponentChildren {
+  const { t } = useT()
   const [users, setUsers] = useState<UserRow[] | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const [email, setEmail] = useState('')
@@ -45,7 +47,7 @@ export function UsersView({ ctx }: { ctx: AppContext }): ComponentChildren {
     try {
       await api.post('/api/users', { email, role })
       setEmail('')
-      ctx.toast('ok', '已添加')
+      ctx.toast('ok', t('users.added'))
       await load()
     }
     catch (caught) {
@@ -55,15 +57,15 @@ export function UsersView({ ctx }: { ctx: AppContext }): ComponentChildren {
 
   const remove = async (user: UserRow) => {
     const ok = await confirm({
-      title: `移除 ${user.email}？`,
-      message: '移除后这个人即使通过了 Cloudflare Access 也无法使用面板，立即生效。',
-      confirmLabel: '移除',
+      title: t('users.removeTitle', user.email),
+      message: t('users.removeBody'),
+      confirmLabel: t('common.remove'),
       danger: true,
     })
     if (!ok) return
     try {
       await api.delete(`/api/users/${encodeURIComponent(user.email)}`)
-      ctx.toast('ok', '已移除')
+      ctx.toast('ok', t('users.removed'))
       await load()
     }
     catch (caught) {
@@ -76,8 +78,8 @@ export function UsersView({ ctx }: { ctx: AppContext }): ComponentChildren {
   return (
     <div class="stack">
       <PageHead
-        title="管理员"
-        description="Cloudflare Access 决定谁能打开面板，这张表决定进来以后能做什么——两者都要通过。"
+        title={t('users.title')}
+        description={t('users.subtitle')}
       />
 
       {error && <ErrorBox error={error} onRetry={() => { void load() }} />}
@@ -89,46 +91,46 @@ export function UsersView({ ctx }: { ctx: AppContext }): ComponentChildren {
             class="input toolbar__search"
             type="email"
             placeholder="someone@example.com"
-            aria-label="新管理员邮箱"
+            aria-label={t('users.emailAria')}
             value={email}
             onInput={event => setEmail((event.target as HTMLInputElement).value)}
           />
           <select
             class="select"
-            aria-label="角色"
+            aria-label={t('users.roleAria')}
             value={role}
             onChange={event => setRole((event.target as HTMLSelectElement).value as typeof role)}
           >
-            <option value="editor">editor — 可编辑内容</option>
-            <option value="owner">owner — 还可管理站点与管理员</option>
+            <option value="editor">{t('users.roleEditor')}</option>
+            <option value="owner">{t('users.roleOwner')}</option>
           </select>
           <button type="button" class="btn btn--primary" disabled={!email.trim()} onClick={() => void add()}>
-            添加
+            {t('users.add')}
           </button>
         </div>
       )}
 
-      {users && <div class="ledger ledger--list" role="table" aria-label="管理员列表">
+      {users && <div class="ledger ledger--list" role="table" aria-label={t('users.title')}>
         <div class="ledger__head" role="row">
-          <span role="columnheader">邮箱</span>
-          <span role="columnheader">角色</span>
-          <span role="columnheader">最近使用</span>
+          <span role="columnheader">{t('users.colEmail')}</span>
+          <span role="columnheader">{t('users.colRole')}</span>
+          <span role="columnheader">{t('users.colLastSeen')}</span>
           <span role="columnheader" />
         </div>
         {users.map(user => (
           <div key={user.email} class="ledger__row ledger__row--static" role="row">
             <span class="ledger__name" role="cell">
               {user.email}
-              {user.email === ctx.health.user.email && <span class="muted">（你）</span>}
+              {user.email === ctx.health.user.email && <span class="muted">{t('users.you')}</span>}
             </span>
             <span role="cell">
               <span class={`mark mark--${user.role === 'owner' ? 'ok' : 'muted'}`}>{user.role}</span>
             </span>
-            <span class="muted" role="cell">{user.last_seen ? formatDate(user.last_seen) : '还没用过'}</span>
+            <span class="muted" role="cell">{user.last_seen ? formatDate(user.last_seen) : t('users.never')}</span>
             <span role="cell">
               {isOwner && user.email !== ctx.health.user.email && (
                 <button type="button" class="btn btn--sm btn--danger" onClick={() => void remove(user)}>
-                  移除
+                  {t('common.remove')}
                 </button>
               )}
             </span>

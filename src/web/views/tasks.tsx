@@ -1,5 +1,5 @@
 /**
- * 任务中心.
+ * Tasks.
  *
  * The panel does not run npm scripts; it dispatches them to GitHub Actions and
  * reports on the run. This screen is where "did it work?" is answered in three
@@ -8,7 +8,7 @@
  *
  * A run outlives the tab that started it, so the list reconciles against GitHub
  * on every open — coming back in the morning shows the real result, never a row
- * stuck on "进行中".
+ * stuck on "running".
  */
 
 import { useEffect, useRef, useState } from 'preact/hooks'
@@ -18,6 +18,7 @@ import type { AppContext } from '../app'
 import { PageHead } from '../app'
 import { Empty, ErrorBox, Loading, StatusMark, relativeTime, useConfirm } from '../components/ui'
 import { SkeletonRows } from '../components/feedback'
+import { useT, type Dictionary, type I18n } from '../lib/i18n'
 
 interface Meta {
   kinds: Array<{ kind: string, description: string, commits: boolean }>
@@ -25,6 +26,7 @@ interface Meta {
 }
 
 export function TasksView({ ctx, siteId }: { ctx: AppContext, siteId: number }): ComponentChildren {
+  const { t } = useT()
   const [meta, setMeta] = useState<Meta | null>(null)
   const [tasks, setTasks] = useState<TaskRow[] | null>(null)
   const [error, setError] = useState<Error | null>(null)
@@ -83,7 +85,7 @@ export function TasksView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
   const start = async () => {
     try {
       await api.post(`/api/sites/${siteId}/tasks`, { kind, args })
-      ctx.toast('ok', '已开始')
+      ctx.toast('ok', t('tasks.started'))
       setArgs('')
       await load()
     }
@@ -95,7 +97,7 @@ export function TasksView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
   const cancel = async (task: TaskRow) => {
     try {
       await api.post(`/api/sites/${siteId}/tasks/${task.id}/cancel`)
-      ctx.toast('ok', '已请求取消')
+      ctx.toast('ok', t('tasks.cancelled'))
       await load()
     }
     catch (caught) {
@@ -111,15 +113,15 @@ export function TasksView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
         `/api/sites/${siteId}/tasks/workflow`,
       )
       const ok = await confirm({
-        title: current.installed ? '更新任务通道？' : '安装任务通道？',
+        title: current.installed ? t('tasks.updateChannelTitle') : t('tasks.installTitle'),
         message: current.installed
-          ? '仓库里已有一个 admin-task.yml。会更新成面板当前的版本；如果你改过它，改动会被覆盖。'
-          : '会在仓库里写 .github/workflows/admin-task.yml。之后仓库所有者需要在 Actions 页面允许这个 workflow 运行。',
-        confirmLabel: current.installed ? '更新' : '安装',
+          ? t('tasks.installConfirmUpdate')
+          : t('tasks.installConfirmNew'),
+        confirmLabel: current.installed ? t('tasks.update') : t('tasks.installAction'),
       })
       if (!ok) return
       await api.put(`/api/sites/${siteId}/tasks/workflow`)
-      ctx.toast('ok', '任务通道已就绪')
+      ctx.toast('ok', t('tasks.ready'))
       await load()
     }
     catch (caught) {
@@ -135,12 +137,12 @@ export function TasksView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
   return (
     <div class="stack">
       <PageHead
-        title="任务"
-        description="npm 脚本在 GitHub Actions 上运行，面板负责触发和显示结果。"
+        title={t('tasks.title')}
+        description={t('tasks.subtitle')}
         actions={
           meta && !installed && (
             <button type="button" class="btn btn--primary" onClick={() => void install()}>
-              安装任务通道
+              {t('tasks.install')}
             </button>
           )
         }
@@ -150,37 +152,47 @@ export function TasksView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
 
       {meta && !installed && (
         <div class="notice notice--warn" role="status">
-          <p>这个仓库还没有任务通道（.github/workflows/admin-task.yml），任务无法触发。</p>
-          <button type="button" class="btn btn--sm" onClick={() => void install()}>安装</button>
+          <p>{t('tasks.notInstalled')}</p>
+          <button type="button" class="btn btn--sm" onClick={() => void install()}>{t('tasks.installAction')}</button>
         </div>
       )}
 
       <div class="toolbar">
-        <select class="select" aria-label="选择任务" value={kind} onChange={event => setKind((event.target as HTMLSelectElement).value)}>
+        <select class="select" aria-label={t('tasks.selectTask')} value={kind} onChange={event => setKind((event.target as HTMLSelectElement).value)}>
           {(meta?.kinds ?? []).map(item => (
             <option key={item.kind} value={item.kind}>
-              {item.kind}{item.commits ? ' （会提交）' : ''}
+              {item.kind}{item.commits ? ` (${t('tasks.commits')})` : ''}
             </option>
           ))}
         </select>
         <input
           class="input toolbar__search mono"
-          placeholder="参数（例如 城南旧事 一一），可留空"
-          aria-label="任务参数"
+          placeholder={t('tasks.argsPlaceholder')}
+          aria-label={t('tasks.argsAria')}
           value={args}
           onInput={event => setArgs((event.target as HTMLInputElement).value)}
         />
         <button type="button" class="btn btn--primary" disabled={!installed} onClick={() => void start()}>
-          运行
+          {t('tasks.run')}
         </button>
       </div>
-      {selected && <p class="hint">{selected.description}{args ? ` · 参数：${args}` : ''}</p>}
+      {/*
+        The description comes from the Worker in Chinese, since it is also what
+        the task channel's own log prints. On an English panel the dictionary
+        wins; an unknown kind falls back to the served text.
+      */}
+      {selected && (
+        <p class="hint">
+          {describeKind(selected.kind, selected.description, t)}
+          {args ? ` · ${args}` : ''}
+        </p>
+      )}
 
       {!tasks ? (
         <SkeletonRows rows={4} />
       ) : !tasks.length ? (
-        <Empty title="还没运行过任务">
-          补封面跑 <code class="mono">covers</code>；改了音乐卡片跑 <code class="mono">music</code>；想确认改动没问题跑 <code class="mono">build</code>。
+        <Empty title={t('tasks.empty')}>
+          {t('tasks.emptyHintPre')} <code class="mono">covers</code>{t('tasks.emptyHintMid')} <code class="mono">music</code>{t('tasks.emptyHintEnd')} <code class="mono">build</code>.
         </Empty>
       ) : (
         <div class="tasks">
@@ -209,6 +221,7 @@ function TaskCard({
   onToggle: () => void
   onCancel: () => void
 }): ComponentChildren {
+  const { t } = useT()
   const result = task.result
   const running = task.status === 'queued' || task.status === 'in_progress'
   const failed = task.status === 'failure' || task.status === 'unknown'
@@ -223,17 +236,17 @@ function TaskCard({
           <StatusMark status={task.status} />
           <span class="mono task__kind">{task.kind}</span>
           {task.args && <span class="mono muted">{task.args}</span>}
-          <span class="muted">{relativeTime(task.created_at)}</span>
+          <span class="muted">{relativeTime(task.created_at, t)}</span>
         </div>
         <div class="row">
           {running && (
-            <button type="button" class="btn btn--sm btn--danger" onClick={onCancel}>取消</button>
+            <button type="button" class="btn btn--sm btn--danger" onClick={onCancel}>{t('tasks.cancel')}</button>
           )}
           <button type="button" class="btn btn--sm btn--ghost" onClick={onToggle} aria-expanded={expanded}>
-            {expanded ? '收起' : '详情'}
+            {expanded ? t('tasks.collapse') : t('tasks.details')}
           </button>
           <a class="btn btn--sm btn--ghost" href={task.log_url} target="_blank" rel="noreferrer noopener">
-            日志
+            {t('tasks.logs')}
           </a>
         </div>
       </header>
@@ -243,8 +256,8 @@ function TaskCard({
       )}
       {failed && (
         <p class="task__result task__result--fail">
-          {failedStep ? `失败的步骤：${failedStep.name}` : '运行失败'}
-          {task.status === 'unknown' && ' · 对不上 GitHub 的 run，请点「日志」确认'}
+          {failedStep ? t('tasks.failedStep', failedStep.name) : t('tasks.failed')}
+          {task.status === 'unknown' && ` · ${t('tasks.mismatch')}`}
         </p>
       )}
 
@@ -258,24 +271,24 @@ function TaskCard({
                   {job.steps.map((step, index) => (
                     <li key={index} class={`step step--${step.conclusion ?? step.status}`}>
                       <span class="step__name">{step.name}</span>
-                      <span class="step__state">{stepLabel(step.conclusion, step.status)}</span>
+                      <span class="step__state">{stepLabel(step.conclusion, step.status, t)}</span>
                     </li>
                   ))}
                 </ol>
               </div>
             ))
           ) : (
-            <p class="hint">没有步骤信息。日志在 GitHub 上，点右上角「日志」。</p>
+            <p class="hint">{t('tasks.noSteps')}</p>
           )}
 
           {result?.files?.length ? (
             <div class="task__files">
-              <h3 class="task__job-name">改动的文件</h3>
+              <h3 class="task__job-name">{t('tasks.changedFiles')}</h3>
               <ul class="files">
                 {result.files.map(file => (
                   <li key={file.path} class="file">
                     <span class={`file__status file__status--${file.status}`}>
-                      {file.status === 'added' ? '新增' : file.status === 'removed' ? '删除' : '修改'}
+                      {file.status === 'added' ? t('tasks.fileAdded') : file.status === 'removed' ? t('tasks.fileRemoved') : t('tasks.fileModified')}
                     </span>
                     <span class="mono file__path">{file.path}</span>
                     <span class="muted">+{file.additions} −{file.deletions}</span>
@@ -290,12 +303,26 @@ function TaskCard({
   )
 }
 
-function stepLabel(conclusion: string | null, status: string): string {
-  if (conclusion === 'success') return '完成'
-  if (conclusion === 'failure') return '失败'
-  if (conclusion === 'skipped') return '跳过'
-  if (conclusion === 'cancelled') return '取消'
-  if (status === 'in_progress') return '进行中'
-  if (status === 'queued') return '排队'
+/**
+ * The description of a task kind, in the reader's language.
+ *
+ * The Worker serves a Chinese description (it is also what the task channel's
+ * log prints), so a known kind is looked up in the dictionary instead. An
+ * unknown kind — one added to the theme's package.json after this build — falls
+ * back to the served text rather than showing a bare key.
+ */
+function describeKind(kind: string, served: string, t: I18n['t']): string {
+  const key = `taskKind.${kind}`
+  const text = t(key as keyof Dictionary)
+  return text === key ? served : text
+}
+
+function stepLabel(conclusion: string | null, status: string, t: I18n['t']): string {
+  if (conclusion === 'success') return t('tasks.stepDone')
+  if (conclusion === 'failure') return t('tasks.stepFailed')
+  if (conclusion === 'skipped') return t('tasks.stepSkipped')
+  if (conclusion === 'cancelled') return t('tasks.stepCancelled')
+  if (status === 'in_progress') return t('tasks.inProgress')
+  if (status === 'queued') return t('tasks.queued')
   return conclusion ?? status
 }

@@ -1,5 +1,5 @@
 /**
- * 媒体库.
+ * Media library.
  *
  * Uploads go through the Worker as base64 in a JSON body: the platform gives a
  * Worker no streaming multipart parser worth the code, and the caps (5 MB per
@@ -15,13 +15,15 @@ import type { AppContext } from '../app'
 import { PageHead } from '../app'
 import { Empty, ErrorBox, useConfirm } from '../components/ui'
 import { SkeletonRows } from '../components/feedback'
+import { useT } from '../lib/i18n'
 
 const FOLDERS = ['images', 'shelf', 'music', 'og'] as const
-const FOLDER_LABELS: Record<string, string> = {
-  images: '配图',
-  shelf: '书架封面',
-  music: '音乐封面',
-  og: '分享图',
+/** The folder labels, resolved through the dictionary at render time. */
+const FOLDER_KEYS: Record<string, keyof import('../lib/i18n').Dictionary> = {
+  images: 'media.images',
+  shelf: 'media.shelf',
+  music: 'media.music',
+  og: 'media.og',
 }
 const MAX_FILE = 5 * 1024 * 1024
 const MAX_BATCH = 20 * 1024 * 1024
@@ -41,6 +43,7 @@ export function MediaView({
   siteId: number
   folder?: string
 }): ComponentChildren {
+  const { t } = useT()
   const [folder, setFolder] = useState<string>(
     FOLDERS.includes((initialFolder ?? '') as (typeof FOLDERS)[number]) ? initialFolder! : 'images',
   )
@@ -70,12 +73,12 @@ export function MediaView({
 
     const tooBig = chosen.find(file => file.size > MAX_FILE)
     if (tooBig) {
-      ctx.toast('danger', `${tooBig.name} 超过 5 MB`)
+      ctx.toast('danger', t('media.sizeLimit', tooBig.name))
       return
     }
     const total = chosen.reduce((sum, file) => sum + file.size, 0)
     if (total > MAX_BATCH) {
-      ctx.toast('danger', '本次选择的文件总量超过 20 MB，分批上传')
+      ctx.toast('danger', t('media.totalLimit'))
       return
     }
 
@@ -89,7 +92,7 @@ export function MediaView({
         `/api/sites/${siteId}/media/${folder}`,
         { files: payload },
       )
-      ctx.toast('ok', `上传了 ${result.files.length} 个文件`)
+      ctx.toast('ok', t('media.uploaded', result.files.length))
       await load()
     }
     catch (caught) {
@@ -107,18 +110,18 @@ export function MediaView({
     ).catch(() => ({ references: [] }))
 
     const ok = await confirm({
-      title: `删除 ${file.name}？`,
+      title: t('media.deleteConfirm', file.name),
       message: refs.references.length
-        ? `${refs.references.length} 个文件还在引用它，删掉之后那些位置会变成破图：`
-        : '没有文章引用这张图。',
-      confirmLabel: '删除',
+        ? t('media.referenced', refs.references.length)
+        : t('media.notReferenced'),
+      confirmLabel: t('common.delete'),
       danger: true,
     })
     if (!ok) return
 
     try {
       await api.delete(`/api/sites/${siteId}/media/${folder}/${encodeURIComponent(file.name)}`)
-      ctx.toast('ok', '已删除')
+      ctx.toast('ok', t('common.deleted'))
       await load()
     }
     catch (caught) {
@@ -130,18 +133,18 @@ export function MediaView({
     const markdown = `![${file.name.replace(/\.[^.]+$/, '')}](${file.url})`
     try {
       await navigator.clipboard.writeText(markdown)
-      ctx.toast('ok', 'Markdown 已复制')
+      ctx.toast('ok', t('media.copied'))
     }
     catch {
-      ctx.toast('warn', `复制失败，手动复制：${markdown}`)
+      ctx.toast('warn', t('media.copyFailed', markdown))
     }
   }
 
   return (
     <div class="stack">
       <PageHead
-        title="媒体"
-        description="public/ 下的图片。上传会直接提交到仓库。"
+        title={t('media.title')}
+        description={t('media.subtitle')}
         actions={
           <div class="row">
             <input
@@ -154,25 +157,25 @@ export function MediaView({
               onChange={event => void upload((event.target as HTMLInputElement).files)}
             />
             <label class="btn btn--primary" for="media-input" aria-disabled={busy}>
-              {busy ? '上传中…' : '上传图片'}
+              {busy ? t('media.uploading') : t('media.upload')}
             </label>
           </div>
         }
       />
 
-      <nav class="subtabs" aria-label="媒体目录">
+      <nav class="subtabs" aria-label={t('media.folderAria')}>
         {FOLDERS.map(name => (
           <button key={name} type="button" class="tab" aria-current={folder === name ? 'page' : undefined} onClick={() => setFolder(name)}>
-            {FOLDER_LABELS[name]}
+            {t(FOLDER_KEYS[name])}
           </button>
         ))}
       </nav>
 
-      <p class="hint">只接受 png、jpg、webp、avif；单张 ≤ 5 MB，一次 ≤ 20 MB。SVG 不允许上传。</p>
+      <p class="hint">{t('media.limits')}</p>
 
       {error && <ErrorBox error={error} onRetry={() => { void load() }} />}
       {!error && !files && <SkeletonRows rows={4} />}
-      {files && !files.length && <Empty title="这个目录还是空的">上传一张图，然后在文章里用它。</Empty>}
+      {files && !files.length && <Empty title={t('media.empty')}>{t('media.emptyHint')}</Empty>}
 
       {files && files.length > 0 && (
         <div class="media-grid">
@@ -186,9 +189,9 @@ export function MediaView({
                 <span class="muted">{(file.size / 1024).toFixed(0)} KB</span>
               </figcaption>
               <div class="row media-card__actions">
-                <button type="button" class="btn btn--sm btn--ghost" onClick={() => void copyMarkdown(file)}>复制</button>
-                <a class="btn btn--sm btn--ghost" href={file.url} target="_blank" rel="noreferrer noopener">查看</a>
-                <button type="button" class="btn btn--sm btn--danger" onClick={() => void remove(file)}>删除</button>
+                <button type="button" class="btn btn--sm btn--ghost" onClick={() => void copyMarkdown(file)}>{t('media.copy')}</button>
+                <a class="btn btn--sm btn--ghost" href={file.url} target="_blank" rel="noreferrer noopener">{t('media.view')}</a>
+                <button type="button" class="btn btn--sm btn--danger" onClick={() => void remove(file)}>{t('common.delete')}</button>
               </div>
             </figure>
           ))}
@@ -207,7 +210,7 @@ function toBase64(file: File): Promise<string> {
       const result = String(reader.result ?? '')
       resolve(result.includes(',') ? result.slice(result.indexOf(',') + 1) : result)
     }
-    reader.onerror = () => reject(reader.error ?? new Error('读取文件失败'))
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'))
     reader.readAsDataURL(file)
   })
 }

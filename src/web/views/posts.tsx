@@ -15,8 +15,10 @@ import { PageHead } from '../app'
 import { navigate } from '../lib/router'
 import { Empty, ErrorBox, Loading, formatDate, useConfirm } from '../components/ui'
 import { ActionButton, SkeletonRows } from '../components/feedback'
+import { useT } from '../lib/i18n'
 
 export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }): ComponentChildren {
+  const { t } = useT()
   const [posts, setPosts] = useState<PostSummary[] | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [error, setError] = useState<Error | null>(null)
@@ -71,13 +73,13 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
     if (!list?.length) return
     const chosen = [...list].filter(file => /\.(md|markdown|mdx)$/i.test(file.name))
     if (!chosen.length) {
-      ctx.toast('warn', '只接受 .md / .markdown 文件')
+      ctx.toast('warn', t('posts.mdOnly'))
       return
     }
 
     const tooBig = chosen.find(file => file.size > 2 * 1024 * 1024)
     if (tooBig) {
-      ctx.toast('danger', `${tooBig.name} 超过 2 MB`)
+      ctx.toast('danger', t('posts.tooBig', tooBig.name))
       return
     }
 
@@ -93,18 +95,18 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
       }>(`/api/sites/${siteId}/posts/import`, { files })
 
       const parts: string[] = []
-      if (result.imported.length) parts.push(`导入 ${result.imported.length} 篇`)
-      if (result.rejected.length) parts.push(`${result.rejected.length} 个无法解析`)
-      if (result.conflicts.length) parts.push(`${result.conflicts.length} 个已存在`)
+      if (result.imported.length) parts.push(t('posts.imported', result.imported.length))
+      if (result.rejected.length) parts.push(t('posts.rejected', result.rejected.length))
+      if (result.conflicts.length) parts.push(t('posts.conflicts', result.conflicts.length))
       ctx.toast(
         result.rejected.length || result.conflicts.length ? 'warn' : 'ok',
-        parts.join(' · ') || '没有可导入的文件',
+        parts.join(' · ') || t('posts.nothingToImport'),
       )
       if (result.rejected.length) {
         ctx.toast('danger', result.rejected.map(item => `${item.name}：${item.reason}`).join('；'))
       }
       if (result.conflicts.length) {
-        ctx.toast('warn', `这些文章已存在，未覆盖：${result.conflicts.join('、')}`)
+        ctx.toast('warn', t('posts.conflictList', result.conflicts.join(lang === 'zh' ? '、' : ', ')))
       }
       await load()
     }
@@ -160,13 +162,14 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
   const runBatch = async (op: string, extra: Record<string, unknown> = {}) => {
     if (!selected.size) return
     const labels: Record<string, string> = {
-      publish: '发布', unpublish: '转为草稿', pin: '置顶', unpin: '取消置顶', delete: '删除',
+      publish: t('posts.publish'), unpublish: t('posts.unpublish'),
+      pin: t('posts.pin'), unpin: t('posts.unpin'), delete: t('common.delete'),
     }
     if (op === 'delete') {
       const ok = await confirm({
-        title: `删除 ${selected.size} 篇文章？`,
-        message: '这会从仓库里删掉这些文件，历史里还能找回，但站点会立刻少掉这些页面。',
-        confirmLabel: '删除',
+        title: t('posts.deleteTitle', selected.size),
+        message: t('posts.deleteBody'),
+        confirmLabel: t('common.delete'),
         danger: true,
       })
       if (!ok) return
@@ -178,7 +181,7 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
         op,
         ...extra,
       })
-      ctx.toast('ok', `已${labels[op] ?? op} ${result.count} 篇`)
+      ctx.toast('ok', t('posts.batchDone', labels[op] ?? op, result.count))
       setSelected(new Set())
       await load()
     }
@@ -206,14 +209,17 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
   return (
     <div class="stack">
       <PageHead
-        title="文章"
+        title={t('posts.title')}
         description={
           // Always a line, even before the data arrives. Omitting it while
           // loading made the list start higher and then drop when the count
           // appeared — the jump in the screenshots.
           loaded
-            ? `${posts.length} 篇 · 置顶 ${posts.filter(post => post.pin > 0).length} · 草稿 ${posts.filter(post => post.draft).length}`
-            : '读取中…'
+            ? t('posts.subtitle', true,
+                posts.length,
+                posts.filter(post => post.pin > 0).length,
+                posts.filter(post => post.draft).length)
+            : t('posts.subtitle', false, 0, 0, 0)
         }
         actions={
           <div class="row">
@@ -226,13 +232,13 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
               id="md-import"
               onChange={event => void importFiles((event.target as HTMLInputElement).files)}
             />
-            <label class="btn" for="md-import">上传 Markdown</label>
+            <label class="btn" for="md-import">{t('posts.importMd')}</label>
             <button
               type="button"
               class="btn btn--primary"
               onClick={() => navigate({ name: 'new-post', siteId })}
             >
-              写新文章
+              {t('posts.newPost')}
             </button>
           </div>
         }
@@ -242,54 +248,54 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
         <input
           class="input toolbar__search"
           type="search"
-          placeholder="搜索标题、摘要、标签"
-          aria-label="搜索文章"
+          placeholder={t('posts.searchPlaceholder')}
+          aria-label={t('posts.searchAria')}
           value={query}
           onInput={event => setQuery((event.target as HTMLInputElement).value)}
         />
         <select
           class="select"
-          aria-label="按标签筛选"
+          aria-label={t('posts.filterTag')}
           value={tag}
           onChange={event => setTag((event.target as HTMLSelectElement).value)}
         >
-          <option value="">全部标签</option>
+          <option value="">{t('posts.allTags')}</option>
           {tags.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
         <select
           class="select"
-          aria-label="按状态筛选"
+          aria-label={t('posts.filterStatus')}
           value={status}
           onChange={event => setStatus((event.target as HTMLSelectElement).value as typeof status)}
         >
-          <option value="all">全部状态</option>
-          <option value="published">已发布</option>
-          <option value="draft">草稿</option>
+          <option value="all">{t('posts.allStatus')}</option>
+          <option value="published">{t('posts.published')}</option>
+          <option value="draft">{t('posts.draft')}</option>
         </select>
         {hasLanguages && (
           <select
             class="select"
-            aria-label="按语言筛选"
+            aria-label={t('posts.filterLanguage')}
             value={lang}
             onChange={event => setLang((event.target as HTMLSelectElement).value as typeof lang)}
           >
-            <option value="all">全部语言</option>
-            <option value="zh">中文</option>
-            <option value="en">English</option>
+            <option value="all">{t('posts.allLanguages')}</option>
+            <option value="zh">{t('editor.langZh')}</option>
+            <option value="en">{t('editor.langEn')}</option>
           </select>
         )}
       </div>
 
       {selected.size > 0 && (
-        <div class="bulkbar" role="region" aria-label="批量操作">
-          <span>已选 {selected.size} 篇</span>
+        <div class="bulkbar" role="region" aria-label="Batch actions">
+          <span>{t('posts.selected', selected.size)}</span>
           <div class="row">
-            <button type="button" class="btn btn--sm" disabled={busy} onClick={() => void runBatch('publish')}>发布</button>
-            <button type="button" class="btn btn--sm" disabled={busy} onClick={() => void runBatch('unpublish')}>转为草稿</button>
-            <button type="button" class="btn btn--sm" disabled={busy} onClick={() => void runBatch('pin', { pin: 1 })}>置顶</button>
-            <button type="button" class="btn btn--sm" disabled={busy} onClick={() => void runBatch('unpin')}>取消置顶</button>
-            <button type="button" class="btn btn--sm btn--danger" disabled={busy} onClick={() => void runBatch('delete')}>删除</button>
-            <button type="button" class="btn btn--sm btn--ghost" onClick={() => setSelected(new Set())}>取消选择</button>
+            <button type="button" class="btn btn--sm" disabled={busy} onClick={() => void runBatch('publish')}>{t('posts.publish')}</button>
+            <button type="button" class="btn btn--sm" disabled={busy} onClick={() => void runBatch('unpublish')}>{t('posts.unpublish')}</button>
+            <button type="button" class="btn btn--sm" disabled={busy} onClick={() => void runBatch('pin', { pin: 1 })}>{t('posts.pin')}</button>
+            <button type="button" class="btn btn--sm" disabled={busy} onClick={() => void runBatch('unpin')}>{t('posts.unpin')}</button>
+            <button type="button" class="btn btn--sm btn--danger" disabled={busy} onClick={() => void runBatch('delete')}>{t('common.delete')}</button>
+            <button type="button" class="btn btn--sm btn--ghost" onClick={() => setSelected(new Set())}>{t('posts.clearSelection')}</button>
           </div>
         </div>
       )}
@@ -298,34 +304,34 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
         <SkeletonRows rows={7} />
       ) : !visible.length ? (
         <Empty
-          title={query || tag || status !== 'all' || lang !== 'all' ? '没有符合条件的文章' : '还没有文章'}
+          title={query || tag || status !== 'all' || lang !== 'all' ? t('posts.noMatch') : t('posts.empty')}
           action={
             <button type="button" class="btn btn--primary" onClick={() => navigate({ name: 'new-post', siteId })}>
-              写第一篇
+              {t('posts.writeFirst')}
             </button>
           }
         >
           {query || tag || status !== 'all' || lang !== 'all'
-            ? '换一个关键词，或把筛选清掉。'
-            : '新建一篇文章，保存后会直接提交到仓库。'}
+            ? t('posts.noMatchHint')
+            : t('posts.emptyHint')}
         </Empty>
       ) : (
         <table class="ledger">
-          <caption class="sr-only">文章列表</caption>
+          <caption class="sr-only">{t('posts.listCaption')}</caption>
           <thead>
             <tr>
               <th scope="col" class="ledger__check">
                 <input
                   type="checkbox"
-                  aria-label="全选当前列表"
+                  aria-label={t('posts.selectAll')}
                   checked={allSelected}
                   onChange={toggleAll}
                 />
               </th>
-              <th scope="col">标题</th>
-              <th scope="col">日期</th>
-              <th scope="col" class="ledger__num">字数</th>
-              <th scope="col">状态</th>
+              <th scope="col">{t('posts.colTitle')}</th>
+              <th scope="col">{t('posts.colDate')}</th>
+              <th scope="col" class="ledger__num">{t('posts.colWords')}</th>
+              <th scope="col">{t('posts.colStatus')}</th>
             </tr>
           </thead>
           <tbody>
@@ -334,7 +340,7 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
                 <td class="ledger__check">
                   <input
                     type="checkbox"
-                    aria-label={`选择《${post.title}》`}
+                    aria-label={t('posts.selectOne', post.title)}
                     checked={selected.has(post.slug)}
                     onChange={() => toggle(post.slug)}
                   />
@@ -347,9 +353,9 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
                     class="ledger__link"
                     href={`#/sites/${siteId}/posts/${encodeURIComponent(post.slug)}`}
                   >
-                    {post.pin > 0 && <span class="pin" title={`置顶权重 ${post.pin}`} aria-hidden="true">↑ </span>}
+                    {post.pin > 0 && <span class="pin" title={t('posts.pinnedOn', post.pin)} aria-hidden="true">↑ </span>}
                     <span class="ledger__name">{post.title}</span>
-                    {post.pin > 0 && <span class="sr-only">（置顶）</span>}
+                    {post.pin > 0 && <span class="sr-only">{t('posts.markedPinned')}</span>}
                   </a>
                   {/* Only on a site that actually mixes languages: a badge
                       saying "en" on every row of an English blog says nothing. */}
@@ -362,7 +368,7 @@ export function PostsView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
                 <td class="ledger__words ledger__num">{post.words.toLocaleString('zh-CN')}</td>
                 <td class="ledger__state">
                   <span class={`mark mark--${post.draft ? 'muted' : 'ok'}`}>
-                    {post.draft ? '草稿' : '已发布'}
+                    {post.draft ? t('posts.draft') : t('posts.published')}
                   </span>
                 </td>
               </tr>

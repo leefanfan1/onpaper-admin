@@ -9,12 +9,13 @@
  */
 
 import type { ComponentChildren } from 'preact'
+import { useT } from '../lib/i18n'
 import { useState } from 'preact/hooks'
 
 /** A spinner. Motion is the only thing that says "working", so it is labelled. */
-export function Spinner({ label = '处理中' }: { label?: string }): ComponentChildren {
+export function Spinner({ label }: { label?: string }): ComponentChildren {
   return (
-    <span class="spinner" role="status" aria-label={label}>
+    <span class="spinner" role="status" aria-label={label ?? '…'}>
       <span class="spinner__ring" aria-hidden="true" />
       <span class="sr-only">{label}</span>
     </span>
@@ -46,6 +47,7 @@ export function ActionButton({
   disabled?: boolean
   ariaLabel?: string
 }): ComponentChildren {
+  const { t } = useT()
   const [running, setRunning] = useState(false)
   const classes = [
     'btn',
@@ -73,7 +75,7 @@ export function ActionButton({
         }
       }}
     >
-      {running ? (<><Spinner label={label ?? '处理中'} />{label ?? '处理中'}</>) : children}
+      {running ? (<><Spinner label={label ?? t('common.working')} />{label ?? t('common.working')}</>) : children}
     </button>
   )
 }
@@ -86,9 +88,10 @@ export function ActionButton({
  * way a browser shows a page load.
  */
 export function ProgressBar({ active }: { active: boolean }): ComponentChildren {
+  const { t } = useT()
   if (!active) return null
   return (
-    <div class="progress" role="progressbar" aria-label="正在读取">
+    <div class="progress" role="progressbar" aria-label={t('common.reading')}>
       <div class="progress__bar" />
     </div>
   )

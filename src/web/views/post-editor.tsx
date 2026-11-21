@@ -22,6 +22,7 @@ import { PageHead } from '../app'
 import { navigate } from '../lib/router'
 import { ErrorBox, formatDate, useConfirm } from '../components/ui'
 import { SkeletonRows } from '../components/feedback'
+import { useT } from '../lib/i18n'
 import { DiffPreview } from '../components/diff'
 import { parseFrontmatterFile } from '../lib/import-post'
 import { renderMarkdown } from '../lib/markdown'
@@ -48,6 +49,7 @@ export function PostEditorView({
   siteId: number
   slug?: string
 }): ComponentChildren {
+  const { t } = useT()
   const isNew = !slug
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [draft, setDraft] = useState<Draft>({
@@ -68,7 +70,7 @@ export function PostEditorView({
     if (isNew) {
       setDetail(null)
       setDraft(current => ({ ...current, slug: '', title: '', description: '', published: formatDate(new Date().toISOString()) }))
-      setBody('在这里开始写正文。\n')
+      setBody(`${t('editor.bodyPlaceholder')}\n`)
       setDirty(false)
       return
     }
@@ -181,10 +183,10 @@ export function PostEditorView({
         // site's own rule). Say so when that changed what was typed, rather
         // than leaving the author to discover it from the address bar.
         if (draft.slug && draft.slug !== result.slug) {
-          ctx.toast('ok', `文章已创建 · 网址规范为 ${result.slug}`)
+          ctx.toast('ok', t('editor.createdSlug', result.slug))
         }
         else {
-          ctx.toast('ok', '文章已创建')
+          ctx.toast('ok', t('editor.created'))
         }
         navigate({ name: 'post', siteId, slug: result.slug })
         return
@@ -212,16 +214,16 @@ export function PostEditorView({
       }
 
       if (!preview.diff.added && !preview.diff.removed) {
-        ctx.toast('info', '内容没有变化')
+        ctx.toast('info', t('editor.noChange'))
         setDirty(false)
         return
       }
 
       const approved = await confirm({
-        title: `保存会改变 ${preview.diff.added} 行、删除 ${preview.diff.removed} 行`,
+        title: t('editor.saveTitle', preview.diff.added, preview.diff.removed),
         message: <DiffPreview diff={preview.diff} renamed={preview.renamed} path={preview.path} />,
-        confirmLabel: '确认保存',
-        cancelLabel: '再看看',
+        confirmLabel: t('editor.confirmSave'),
+        cancelLabel: t('editor.lookAgain'),
       })
       if (!approved) return
 
@@ -237,12 +239,12 @@ export function PostEditorView({
       setDetail({ ...detail, sha: result.sha, slug: result.slug })
       setDraft(current => ({ ...current, slug: result.slug }))
       setDirty(false)
-      ctx.toast('ok', '已保存并提交')
+      ctx.toast('ok', t('editor.saved'))
       if (result.slug !== detail.slug) navigate({ name: 'post', siteId, slug: result.slug })
     }
     catch (caught) {
       if (isApiError(caught) && caught.code === 'CONFLICT') {
-        ctx.toast('danger', '这篇文章在你编辑期间被改过，请刷新后再保存')
+        ctx.toast('danger', t('editor.conflict'))
       }
       else {
         ctx.toast('danger', isApiError(caught) ? caught.message : String(caught))
@@ -266,11 +268,11 @@ export function PostEditorView({
     const file = list?.[0]
     if (!file) return
     if (!/\.(md|markdown|mdx)$/i.test(file.name)) {
-      ctx.toast('warn', '只接受 .md / .markdown 文件')
+      ctx.toast('warn', t('posts.mdOnly'))
       return
     }
     if (file.size > 2 * 1024 * 1024) {
-      ctx.toast('danger', `${file.name} 超过 2 MB`)
+      ctx.toast('danger', t('posts.tooBig', file.name))
       return
     }
 
@@ -291,22 +293,22 @@ export function PostEditorView({
     setBody(parsed.body)
     setDirty(true)
     if (parsed.warning) ctx.toast('warn', parsed.warning)
-    else ctx.toast('ok', `已载入《${parsed.frontmatter.title || file.name}》`)
+    else ctx.toast('ok', t('editor.loaded', parsed.frontmatter.title || file.name))
     if (importInput.current) importInput.current.value = ''
   }
 
   const remove = async () => {
     if (!detail) return
     const ok = await confirm({
-      title: `删除《${detail.frontmatter.title}》？`,
-      message: '文件会从仓库里删掉。GitHub 的历史里还能找回，但站点会立刻少掉这个页面。',
-      confirmLabel: '删除',
+      title: t('editor.deleteTitle', detail.frontmatter.title),
+      message: t('editor.deleteBody'),
+      confirmLabel: t('common.delete'),
       danger: true,
     })
     if (!ok) return
     try {
       await api.delete(`/api/sites/${siteId}/posts/${encodeURIComponent(detail.slug)}?sha=${detail.sha}`)
-      ctx.toast('ok', '已删除')
+      ctx.toast('ok', t('editor.deleted'))
       navigate({ name: 'posts', siteId })
     }
     catch (caught) {
@@ -336,7 +338,7 @@ export function PostEditorView({
   if (!isNew && !detail) {
     return (
       <div class="stack">
-        <PageHead title="编辑文章" description="正在读取仓库里的文件…" />
+        <PageHead title={t('editor.edit')} description={t('editor.opening')} />
         <SkeletonRows rows={6} />
       </div>
     )
@@ -345,11 +347,11 @@ export function PostEditorView({
   return (
     <div class="stack">
       <PageHead
-        title={isNew ? '写新文章' : '编辑文章'}
+        title={isNew ? t('editor.new') : t('editor.edit')}
         description={
           isNew
-            ? '保存后会直接在仓库里新建一个 Markdown 文件。'
-            : detail ? `/posts/${detail.slug}/ · ${detail.words} 字 · 约 ${detail.minutes} 分钟` : undefined
+            ? t('editor.newHint')
+            : detail ? t('editor.meta', detail.slug, detail.words, detail.minutes) : undefined
         }
         actions={
           <div class="row">
@@ -366,7 +368,7 @@ export function PostEditorView({
                   id="md-into-editor"
                   onChange={event => void loadFromFile((event.target as HTMLInputElement).files)}
                 />
-                <label class="btn" for="md-into-editor">从 MD 文件载入</label>
+                <label class="btn" for="md-into-editor">{t('editor.writeMd')}</label>
               </>
             )}
             {!isNew && (
@@ -378,13 +380,13 @@ export function PostEditorView({
                   href={`/api/sites/${siteId}/posts/${encodeURIComponent(detail?.slug ?? '')}/download`}
                   download={`${detail?.slug ?? 'post'}.md`}
                 >
-                  下载 MD
+                  {t('editor.download')}
                 </a>
-                <button type="button" class="btn btn--danger" onClick={() => void remove()}>删除</button>
+                <button type="button" class="btn btn--danger" onClick={() => void remove()}>{t('common.delete')}</button>
               </>
             )}
             <button type="button" class="btn btn--primary" disabled={saving} onClick={() => void save()}>
-              {saving ? '保存中…' : isNew ? '创建' : '检查并保存'}
+              {saving ? t('common.saving') : isNew ? t('editor.create') : t('editor.checkAndSave')}
             </button>
           </div>
         }
@@ -393,7 +395,7 @@ export function PostEditorView({
       <div class="meta-grid">
         {isNew && (
           <label class="field">
-            <span class="label">网址（文件名）</span>
+            <span class="label">{t('editor.slugField')}</span>
             <input
               class="input mono"
               value={draft.slug}
@@ -404,11 +406,11 @@ export function PostEditorView({
                 setDirty(true)
               }}
             />
-            <span class="hint" id="slug-hint">只用小写英文、数字和连字符；中文标题写在下面。</span>
+            <span class="hint" id="slug-hint">{t('editor.slugFieldHint')}</span>
           </label>
         )}
         <label class="field">
-          <span class="label">标题</span>
+          <span class="label">{t('editor.titleField')}</span>
           <input
             class="input"
             value={draft.title}
@@ -419,7 +421,7 @@ export function PostEditorView({
           />
         </label>
         <label class="field">
-          <span class="label">发布日期</span>
+          <span class="label">{t('editor.published')}</span>
           <input
             class="input"
             type="date"
@@ -431,11 +433,11 @@ export function PostEditorView({
           />
         </label>
         <label class="field meta-grid__wide">
-          <span class="label">摘要</span>
+          <span class="label">{t('editor.descriptionField')}</span>
           <input
             class="input"
             value={draft.description}
-            placeholder="一句话摘要，会出现在列表、搜索和分享卡片里"
+            placeholder={t('editor.descriptionPlaceholder')}
             onInput={event => {
               setDraft(current => ({ ...current, description: (event.target as HTMLInputElement).value }))
               setDirty(true)
@@ -443,11 +445,11 @@ export function PostEditorView({
           />
         </label>
         <label class="field">
-          <span class="label">标签</span>
+          <span class="label">{t('editor.tags')}</span>
           <input
             class="input"
             value={draft.tags}
-            placeholder="随笔, 城市"
+            placeholder={t('editor.tagsPlaceholder')}
             onInput={event => {
               setDraft(current => ({ ...current, tags: (event.target as HTMLInputElement).value }))
               setDirty(true)
@@ -455,7 +457,7 @@ export function PostEditorView({
           />
         </label>
         <label class="field">
-          <span class="label">置顶权重</span>
+          <span class="label">{t('editor.pin')}</span>
           <input
             class="input"
             type="number"
@@ -475,20 +477,20 @@ export function PostEditorView({
         */}
         {draft.lang !== '' && (
           <label class="field">
-            <span class="label">文章语言</span>
+            <span class="label">{t('editor.lang')}</span>
             <select
               class="select"
-              aria-label="文章语言"
+              aria-label={t('editor.lang')}
               value={draft.lang}
               onChange={event => {
                 setDraft(current => ({ ...current, lang: (event.target as HTMLSelectElement).value }))
                 setDirty(true)
               }}
             >
-              <option value="zh">中文</option>
-              <option value="en">English</option>
+              <option value="zh">{t('editor.langZh')}</option>
+              <option value="en">{t('editor.langEn')}</option>
             </select>
-            <span class="hint">只描述正文用哪种语言写成，不影响界面语言。</span>
+            <span class="hint">{t('editor.langHint')}</span>
           </label>
         )}
         <label class="field meta-grid__check">
@@ -501,13 +503,13 @@ export function PostEditorView({
                 setDirty(true)
               }}
             />{' '}
-            存为草稿
+            {t('editor.draft')}
           </span>
-          <span class="hint">草稿只在开发环境可见</span>
+          <span class="hint">{t('editor.draftHint')}</span>
         </label>
         {!isNew && (
           <label class="field">
-            <span class="label">网址</span>
+            <span class="label">{t('editor.slug')}</span>
             <input
               class="input mono"
               value={draft.slug}
@@ -516,13 +518,13 @@ export function PostEditorView({
                 setDirty(true)
               }}
             />
-            <span class="hint">改名会在同一个提交里移动文件。</span>
+            <span class="hint">{t('editor.slugHint')}</span>
           </label>
         )}
       </div>
 
       <div class="editor" data-pane={pane}>
-        <div class="editor__tabs" role="tablist" aria-label="编辑与预览">
+        <div class="editor__tabs" role="tablist" aria-label={t('editor.paneAria')}>
           <button
             type="button"
             role="tab"
@@ -530,7 +532,7 @@ export function PostEditorView({
             aria-selected={pane === 'write'}
             onClick={() => setPane('write')}
           >
-            正文
+            {t('editor.paneWrite')}
           </button>
           <button
             type="button"
@@ -539,10 +541,10 @@ export function PostEditorView({
             aria-selected={pane === 'preview'}
             onClick={() => setPane('preview')}
           >
-            预览
+            {t('editor.panePreview')}
           </button>
           <span class="editor__spacer" />
-          {dirty && <span class="mark mark--warn">未保存</span>}
+          {dirty && <span class="mark mark--warn">{t('editor.unsaved')}</span>}
         </div>
 
         <div class="editor__panes">
@@ -550,7 +552,7 @@ export function PostEditorView({
           <div class="editor__pane editor__pane--preview">
             <iframe
               class="preview-frame"
-              title="文章预览"
+              title={t('editor.previewTitle')}
               /*
                 `allow-scripts` without `allow-same-origin`: the frame needs to
                 run Mermaid to draw a diagram, and that one attribute is what

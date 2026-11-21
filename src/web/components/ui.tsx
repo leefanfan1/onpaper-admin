@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks'
 import type { ComponentChildren } from 'preact'
+import { useT, type Dictionary, type I18n } from '../lib/i18n'
 
 // ---------------------------------------------------------------------------
 // Dialog
@@ -30,6 +31,7 @@ export interface ConfirmOptions {
  * destructive dialog does not destroy anything.
  */
 export function useConfirm(): [ComponentChildren, (options: ConfirmOptions) => Promise<boolean>] {
+  const { t } = useT()
   const [options, setOptions] = useState<ConfirmOptions | null>(null)
   const resolver = useRef<((value: boolean) => void) | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -83,14 +85,14 @@ export function useConfirm(): [ComponentChildren, (options: ConfirmOptions) => P
               autofocus
               onClick={() => { returnValue.current = 'cancel'; dialogRef.current?.close() }}
             >
-              {options.cancelLabel ?? '取消'}
+              {options.cancelLabel ?? t('common.cancel')}
             </button>
             <button
               type="button"
               class={options.danger ? 'btn btn--danger' : 'btn btn--primary'}
               onClick={() => { returnValue.current = 'confirm'; dialogRef.current?.close() }}
             >
-              {options.confirmLabel ?? '确定'}
+              {options.confirmLabel ?? t('common.confirm')}
             </button>
           </div>
         </div>
@@ -136,12 +138,13 @@ export function useToasts(): {
 }
 
 export function ToastStack({ toasts, dismiss }: { toasts: Toast[], dismiss: (id: number) => void }): ComponentChildren {
+  const { t } = useT()
   return (
-    <div class="toasts" role="region" aria-label="通知">
+    <div class="toasts" role="region" aria-label={t('shell.notifications')}>
       {toasts.map(toast => (
         <div key={toast.id} class={`toast toast--${toast.tone}`} role="status">
           <span class="toast__text">{toast.message}</span>
-          <button type="button" class="toast__close" aria-label="关闭通知" onClick={() => dismiss(toast.id)}>
+          <button type="button" class="toast__close" aria-label={t('shell.dismissToast')} onClick={() => dismiss(toast.id)}>
             ×
           </button>
         </div>
@@ -154,13 +157,14 @@ export function ToastStack({ toasts, dismiss }: { toasts: Toast[], dismiss: (id:
 // Status marks
 // ---------------------------------------------------------------------------
 
-const STATUS_LABEL: Record<string, string> = {
-  queued: '排队中',
-  in_progress: '进行中',
-  success: '成功',
-  failure: '失败',
-  cancelled: '已取消',
-  unknown: '待确认',
+/** Status labels live in the dictionary; this maps a status to its key. */
+const STATUS_KEY: Record<string, keyof Dictionary> = {
+  queued: 'tasks.queued',
+  in_progress: 'tasks.inProgress',
+  success: 'tasks.success',
+  failure: 'tasks.failedLabel',
+  cancelled: 'status.cancelled',
+  unknown: 'status.unknown',
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -180,9 +184,11 @@ const STATUS_TONE: Record<string, string> = {
  * would without relying on colour alone (the label is always there).
  */
 export function StatusMark({ status }: { status: string }): ComponentChildren {
+  const { t } = useT()
+  const key = STATUS_KEY[status]
   return (
     <span class={`mark mark--${STATUS_TONE[status] ?? 'muted'}`}>
-      {STATUS_LABEL[status] ?? status}
+      {key ? t(key) : status}
     </span>
   )
 }
@@ -209,15 +215,17 @@ export function Empty({
   )
 }
 
-export function Loading({ label = '读取中' }: { label?: string }): ComponentChildren {
-  return <p class="loading" role="status">{label}…</p>
+export function Loading({ label }: { label?: string }): ComponentChildren {
+  const { t } = useT()
+  return <p class="loading" role="status">{label ?? t('common.loading')}</p>
 }
 
 export function ErrorBox({ error, onRetry }: { error: Error, onRetry?: () => void }): ComponentChildren {
+  const { t } = useT()
   return (
     <div class="error-box" role="alert">
       <p>{error.message}</p>
-      {onRetry && <button type="button" class="btn btn--sm" onClick={onRetry}>重试</button>}
+      {onRetry && <button type="button" class="btn btn--sm" onClick={onRetry}>{t('common.retry')}</button>}
     </div>
   )
 }
@@ -230,29 +238,35 @@ export function formatDate(value?: string): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-/** A relative time, for task rows where "3 分钟前" matters more than a stamp. */
-export function relativeTime(value?: string): string {
+/**
+ * A relative time, for task rows where "3 minutes ago" reads better than a
+ * timestamp.
+ *
+ * Takes the language rather than reaching for a context: it is a plain function
+ * called from render code, and a hook would make it unusable anywhere else.
+ */
+export function relativeTime(value: string | undefined, t: I18n['t']): string {
   if (!value) return '—'
   const then = new Date(value).getTime()
   if (Number.isNaN(then)) return value
   const seconds = Math.round((Date.now() - then) / 1000)
-  if (seconds < 60) return '刚刚'
+  if (seconds < 60) return t('time.justNow')
   const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes} 分钟前`
+  if (minutes < 60) return t('time.minutesAgo', minutes)
   const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours} 小时前`
+  if (hours < 24) return t('time.hoursAgo', hours)
   const days = Math.round(hours / 24)
-  if (days < 30) return `${days} 天前`
+  if (days < 30) return t('time.daysAgo', days)
   return formatDate(value)
 }
 
-export function duration(between?: number): string {
+export function duration(between: number | undefined, t: I18n['t']): string {
   if (!between || between < 0) return ''
   const seconds = Math.round(between / 1000)
-  if (seconds < 60) return `${seconds} 秒`
+  if (seconds < 60) return t('time.seconds', seconds)
   const minutes = Math.floor(seconds / 60)
   const rest = seconds % 60
-  return `${minutes} 分 ${rest} 秒`
+  return t('time.minutesSeconds', minutes, rest)
 }
 
 export { DialogShell as Dialog }
@@ -278,6 +292,7 @@ function DialogShell({
   footer?: ComponentChildren
   wide?: boolean
 }): ComponentChildren {
+  const { t } = useT()
   const ref = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
@@ -302,7 +317,7 @@ function DialogShell({
         <div class="modal__body">
           <div class="modal__head">
             <h2 id="dialog-title" class="modal__title">{title}</h2>
-            <button type="button" class="btn btn--ghost btn--sm" onClick={onClose} aria-label="关闭">×</button>
+            <button type="button" class="btn btn--ghost btn--sm" onClick={onClose} aria-label={t('common.close')}>×</button>
           </div>
           <div class="modal__content">{children}</div>
           {footer && <div class="modal__actions">{footer}</div>}

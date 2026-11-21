@@ -70,6 +70,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw makeError(0, 'NETWORK', `无法连接服务器：${error instanceof Error ? error.message : String(error)}`)
   }
 
+  // (the error message is localised below, once the response body is read)
+
   if (response.status === 204) return undefined as T
 
   const text = await response.text()
@@ -83,11 +85,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const record = body as { error?: string, code?: string } | null
-    throw makeError(
-      response.status,
-      record?.code ?? 'HTTP',
-      record?.error ?? `请求失败（${response.status}）`,
-    )
+    const code = record?.code ?? 'HTTP'
+    /*
+     * The message is chosen here, in the reader's language, from the code the
+     * Worker sent.
+     *
+     * The Worker answers with a stable `code` (`CONFLICT`, `RATE_LIMIT`, …) and
+     * a Chinese sentence. Reading the sentence is right when it says something
+     * the codes cannot — a GitHub quota window, a file name — so it is kept as
+     * the fallback, but a known code gets the dictionary's wording.
+     */
+    const message = localisedError(code) ?? record?.error ?? `请求失败（${response.status}）`
+    throw makeError(response.status, code, message)
   }
   return body as T
 }
@@ -271,7 +280,7 @@ export interface Site {
   repo: string
   branch: string
   paths: Record<string, string>
-  /** The published site, e.g. https://example.com — where media is served. */
+  /** The published site, e.g. https://liff.cc — where media is served. */
   publicUrl: string
   enabled: boolean
   createdAt: string
@@ -405,4 +414,34 @@ export interface CommitSummary {
   author: string
   date: string
   url: string
+}
+
+// ---------------------------------------------------------------------------
+// Localised error messages
+// ---------------------------------------------------------------------------
+
+/**
+ * The panel's current language, for the API layer.
+ *
+ * The app sets this whenever the language changes. It lives here rather than
+ * being passed through every call because the error is constructed inside
+ * `request`, far from any component that could supply it — and a wrong-language
+ * error is worse than a plain one.
+ */
+type Translate = (key: never, ...args: unknown[]) => string
+
+let currentTranslate: Translate | null = null
+
+/** Called whenever the panel's language changes; the app owns the translator. */
+export function setErrorTranslator(fn: Translate | null): void {
+  currentTranslate = fn
+}
+
+/** The dictionary's wording for a Worker error code, or `null` when unknown. */
+function localisedError(code: string): string | null {
+  if (!currentTranslate) return null
+  const key = `error.${code}`
+  const text = currentTranslate(key as never)
+  // The translator echoes an unknown key back; that is the "no entry" signal.
+  return text === key ? null : text
 }

@@ -13,6 +13,7 @@ import type { AppContext } from '../app'
 import { PageHead } from '../app'
 import { SkeletonRows } from '../components/feedback'
 import { Empty, ErrorBox, Loading, StatusMark, relativeTime } from '../components/ui'
+import { useT } from '../lib/i18n'
 
 interface Overview {
   sites: Array<{ id: number, name: string, repo: string, branch: string, enabled: boolean }>
@@ -25,6 +26,7 @@ interface Overview {
 }
 
 export function OverviewView({ ctx }: { ctx: AppContext, route: never }): ComponentChildren {
+  const { t } = useT()
   const [data, setData] = useState<Overview | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
@@ -48,32 +50,32 @@ export function OverviewView({ ctx }: { ctx: AppContext, route: never }): Compon
   return (
     <div class="stack">
       <PageHead
-        title="总览"
-        description={`${data.sites.length} 个站点${attention ? ` · ${data.tasks.open} 个任务进行中 · ${data.tasks.recentFailures} 个待处理` : ' · 一切正常'}`}
+        title={t('overview.title')}
+        description={t('overview.subtitle', data.sites.length, data.tasks.open, data.tasks.recentFailures, attention)}
       />
 
       {attention && (
         <div class="notice" role="status">
-          {data.tasks.open > 0 && <p>{data.tasks.open} 个任务正在运行，完成后会写回仓库。</p>}
+          {data.tasks.open > 0 && <p>{t('overview.running', data.tasks.open)}</p>}
           {data.tasks.recentFailures > 0 && (
-            <p>{data.tasks.recentFailures} 个任务在最近 7 天失败或待确认。去任务中心看是哪一步。</p>
+            <p>{t('overview.failures', data.tasks.recentFailures)}</p>
           )}
         </div>
       )}
 
       {!data.sites.length ? (
         <Empty
-          title="还没连接任何站点"
-          action={<a class="btn btn--primary" href="#/sites">连接一个仓库</a>}
+          title={t('overview.noSites')}
+          action={<a class="btn btn--primary" href="#/sites">{t('overview.connectOne')}</a>}
         >
-          面板通过 GitHub 读写仓库，站点可以是任意一个 OnPaper 主题的博客仓库。
+          {t('overview.noSitesHint')}
         </Empty>
       ) : (
-        <div class="ledger ledger--list" role="table" aria-label="站点列表">
+        <div class="ledger ledger--list" role="table" aria-label={t('nav.aria.sites')}>
           <div class="ledger__head" role="row">
-            <span role="columnheader">站点</span>
-            <span role="columnheader">仓库</span>
-            <span role="columnheader">最近任务</span>
+            <span role="columnheader">{t('overview.colSite')}</span>
+            <span role="columnheader">{t('overview.colRepo')}</span>
+            <span role="columnheader">{t('overview.colLastTask')}</span>
           </div>
           {data.lastRuns.map(item => (
             <a
@@ -93,10 +95,10 @@ export function OverviewView({ ctx }: { ctx: AppContext, route: never }): Compon
                   <span class="row">
                     <StatusMark status={item.lastTask.status} />
                     <span class="muted mono">{item.lastTask.kind}</span>
-                    <span class="muted">{relativeTime(item.lastTask.created_at)}</span>
+                    <span class="muted">{relativeTime(item.lastTask.created_at, t)}</span>
                   </span>
                 ) : (
-                  <span class="muted">还没运行过</span>
+                  <span class="muted">{t('users.never')}</span>
                 )}
               </span>
             </a>
@@ -105,20 +107,20 @@ export function OverviewView({ ctx }: { ctx: AppContext, route: never }): Compon
       )}
 
       <section class="stack">
-        <h2>面板能做什么</h2>
+        <h2>{t('overview.canDo')}</h2>
         <dl class="capabilities">
-          <dt>文章</dt>
-          <dd>新建、编辑、删除、改网址、批量发布与置顶；Markdown 编辑与实时预览。</dd>
-          <dt>页面与友链</dt>
-          <dd>关于页、最近页、友链列表；「最近」按在听 / 在读 / 在看三段编辑。</dd>
-          <dt>书架</dt>
-          <dd>书单、片单、歌单逐条增删改，一键触发 <code class="mono">npm run covers</code> 补封面。</dd>
-          <dt>站点配置</dt>
-          <dd>站名、导航、社交链接、配色 token、功能开关；只改值，注释原样保留。</dd>
-          <dt>媒体</dt>
-          <dd>图片上传与管理，<code class="mono">og.svg</code> 编辑后触发重新生成。</dd>
-          <dt>任务</dt>
-          <dd><code class="mono">covers</code>、<code class="mono">music</code>、<code class="mono">og</code>、<code class="mono">build</code> 在 GitHub Actions 上运行，面板显示步骤级状态与改动摘要。</dd>
+          <dt>{t('nav.posts')}</dt>
+          <dd>{t('overview.doPosts')}</dd>
+          <dt>{t('nav.pages')}</dt>
+          <dd>{t('overview.doPages')}</dd>
+          <dt>{t('nav.shelf')}</dt>
+          <dd>{t('overview.doShelf')}</dd>
+          <dt>{t('nav.config')}</dt>
+          <dd>{t('overview.doConfig')}</dd>
+          <dt>{t('nav.media')}</dt>
+          <dd>{t('overview.doMedia')}</dd>
+          <dt>{t('nav.tasks')}</dt>
+          <dd>{t('overview.doTasks')}</dd>
         </dl>
       </section>
     </div>

@@ -14,8 +14,10 @@ import type { AppContext } from '../app'
 import { PageHead } from '../app'
 import { Dialog, Empty, ErrorBox, Loading, useConfirm } from '../components/ui'
 import { SkeletonRows } from '../components/feedback'
+import { useT } from '../lib/i18n'
 
 export function SitesView({ ctx }: { ctx: AppContext }): ComponentChildren {
+  const { t } = useT()
   const [sites, setSites] = useState<Site[] | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const [editing, setEditing] = useState<Site | 'new' | null>(null)
@@ -36,15 +38,15 @@ export function SitesView({ ctx }: { ctx: AppContext }): ComponentChildren {
 
   const remove = async (site: Site) => {
     const ok = await confirm({
-      title: `断开「${site.name}」？`,
-      message: '只会从面板里移除这个站点，仓库和内容都不会被动。审计日志和任务记录会一起清掉。',
-      confirmLabel: '断开',
+      title: t('sites.disconnectTitle', site.name),
+      message: t('sites.disconnectBody'),
+      confirmLabel: t('sites.disconnect'),
       danger: true,
     })
     if (!ok) return
     try {
       await api.delete(`/api/sites/${site.id}`)
-      ctx.toast('ok', '已断开')
+      ctx.toast('ok', t('sites.disconnected'))
       await load()
     }
     catch (caught) {
@@ -57,12 +59,12 @@ export function SitesView({ ctx }: { ctx: AppContext }): ComponentChildren {
   return (
     <div class="stack">
       <PageHead
-        title="站点"
-        description="面板可以连接任意多个 OnPaper 主题仓库，每个站点独立选择分支和内容路径。"
+        title={t('sites.title')}
+        description={t('sites.subtitle')}
         actions={
           isOwner && (
             <button type="button" class="btn btn--primary" onClick={() => setEditing('new')}>
-              连接仓库
+              {t('sites.connect')}
             </button>
           )
         }
@@ -72,8 +74,8 @@ export function SitesView({ ctx }: { ctx: AppContext }): ComponentChildren {
       {!sites && !error && <SkeletonRows rows={3} />}
 
       {sites && !sites.length ? (
-        <Empty title="还没有站点">
-          {isOwner ? '点「连接仓库」，填 owner/repo 和分支。' : '需要 owner 添加站点。'}
+        <Empty title={t('sites.empty')}>
+          {isOwner ? t('sites.emptyOwner') : t('sites.emptyEditor')}
         </Empty>
       ) : sites ? (
         <div class="stack">
@@ -87,14 +89,14 @@ export function SitesView({ ctx }: { ctx: AppContext }): ComponentChildren {
                   <p class="mono muted">{site.owner}/{site.repo} · {site.branch}</p>
                   {site.publicUrl
                     ? <p class="mono muted">{site.publicUrl}</p>
-                    : <p class="mark mark--warn">未设置站点地址，图片不会显示</p>}
+                    : <p class="mark mark--warn">{t('sites.noPublicUrl')}</p>}
                 </div>
                 <div class="row">
-                  <a class="btn btn--sm" href={`#/sites/${site.id}/posts`}>进入</a>
+                  <a class="btn btn--sm" href={`#/sites/${site.id}/posts`}>{t('sites.enter')}</a>
                   {isOwner && (
                     <>
-                      <button type="button" class="btn btn--sm" onClick={() => setEditing(site)}>编辑</button>
-                      <button type="button" class="btn btn--sm btn--danger" onClick={() => void remove(site)}>断开</button>
+                      <button type="button" class="btn btn--sm" onClick={() => setEditing(site)}>{t('common.edit')}</button>
+                      <button type="button" class="btn btn--sm btn--danger" onClick={() => void remove(site)}>{t('sites.disconnect')}</button>
                     </>
                   )}
                 </div>
@@ -138,6 +140,7 @@ function SiteDialog({
   onSaved: () => Promise<void>
   toast: AppContext['toast']
 }): ComponentChildren {
+  const { t } = useT()
   const isNew = site === 'new'
   const [name, setName] = useState('')
   const [owner, setOwner] = useState('')
@@ -177,11 +180,11 @@ function SiteDialog({
     try {
       if (isNew) {
         await api.post('/api/sites', { name, owner, repo, branch, patRef, publicUrl })
-        toast('ok', '站点已连接')
+        toast('ok', t('sites.connected'))
       }
       else if (site) {
         await api.put(`/api/sites/${site.id}`, { name, owner, repo, branch, patRef, publicUrl })
-        toast('ok', '已保存')
+        toast('ok', t('common.saved'))
       }
       await onSaved()
     }
@@ -198,7 +201,7 @@ function SiteDialog({
     try {
       await api.put(`/api/sites/${site.id}/token`, { token })
       setToken('')
-      toast('ok', '令牌已加密保存')
+      toast('ok', t('sites.tokenSaved'))
     }
     catch (caught) {
       toast('danger', isApiError(caught) ? caught.message : String(caught))
@@ -218,56 +221,56 @@ function SiteDialog({
   return (
     <Dialog
       open={site !== null}
-      title={isNew ? '连接仓库' : '编辑站点'}
+      title={isNew ? t('sites.connectTitle') : t('sites.editTitle')}
       onClose={onClose}
       footer={
         <>
-          <button type="button" class="btn" onClick={onClose}>取消</button>
+          <button type="button" class="btn" onClick={onClose}>{t('common.cancel')}</button>
           <button type="button" class="btn btn--primary" disabled={busy} onClick={() => void submit()}>
-            {busy ? '保存中…' : isNew ? '连接' : '保存'}
+            {busy ? t('common.saving') : isNew ? t('sites.connect') : t('common.save')}
           </button>
         </>
       }
     >
       <div class="stack">
         <label class="field">
-          <span class="label">显示名称</span>
-          <input class="input" value={name} onInput={event => setName((event.target as HTMLInputElement).value)} placeholder="我的博客" />
+          <span class="label">{t('sites.displayName')}</span>
+          <input class="input" value={name} onInput={event => setName((event.target as HTMLInputElement).value)} placeholder={t('sites.namePlaceholder')} />
         </label>
         <div class="meta-grid">
           <label class="field">
-            <span class="label">GitHub 用户名或组织</span>
-            <input class="input mono" value={owner} onInput={event => setOwner((event.target as HTMLInputElement).value)} placeholder="your-github-name" />
+            <span class="label">{t('sites.owner')}</span>
+            <input class="input mono" value={owner} onInput={event => setOwner((event.target as HTMLInputElement).value)} placeholder="leefanfan1" />
           </label>
           <label class="field">
-            <span class="label">仓库</span>
-            <input class="input mono" value={repo} onInput={event => setRepo((event.target as HTMLInputElement).value)} placeholder="your-repo" />
+            <span class="label">{t('sites.repo')}</span>
+            <input class="input mono" value={repo} onInput={event => setRepo((event.target as HTMLInputElement).value)} placeholder="cijianfanfan" />
           </label>
           <label class="field">
-            <span class="label">分支</span>
+            <span class="label">{t('sites.branch')}</span>
             <input class="input mono" value={branch} onInput={event => setBranch((event.target as HTMLInputElement).value)} placeholder="main" />
           </label>
           <label class="field meta-grid__wide">
-            <span class="label">站点地址（发布后的域名）</span>
+            <span class="label">{t('sites.publicUrl')}</span>
             <input
               class="input mono"
               value={publicUrl}
-              placeholder="https://example.com"
+              placeholder="https://liff.cc"
               onInput={event => setPublicUrl((event.target as HTMLInputElement).value)}
             />
-            <span class="hint">书架封面和媒体库的图片从这里读取；留空则图片无法显示。</span>
+            <span class="hint">{t('sites.publicUrlHint')}</span>
           </label>
           <label class="field">
-            <span class="label">令牌 secret 名（可选）</span>
-            <input class="input mono" value={patRef} onInput={event => setPatRef((event.target as HTMLInputElement).value)} placeholder="留空用默认 GITHUB_PAT" />
-            <span class="hint">填了就用这个 Worker secret，不会退回默认令牌。</span>
+            <span class="label">{t('sites.patRef')}</span>
+            <input class="input mono" value={patRef} onInput={event => setPatRef((event.target as HTMLInputElement).value)} placeholder={t('sites.patRefPlaceholder')} />
+            <span class="hint">{t('sites.patRefHint')}</span>
           </label>
         </div>
 
         {!isNew && (
           <div class="stack">
             <label class="field">
-              <span class="label">这个站点专用令牌（可选）</span>
+              <span class="label">{t('sites.token')}</span>
               <div class="row">
                 <input
                   class="input mono"
@@ -275,31 +278,31 @@ function SiteDialog({
                   autocomplete="off"
                   value={token}
                   onInput={event => setToken((event.target as HTMLInputElement).value)}
-                  placeholder="ghp_… 或 github_pat_…"
+                  placeholder="ghp_… / github_pat_…"
                 />
                 <button type="button" class="btn" disabled={!token.trim()} onClick={() => void saveToken()}>
-                  加密保存
+                  {t('sites.tokenSave')}
                 </button>
               </div>
-              <span class="hint">用 AES-GCM 加密后存进 D1，明文只在你提交的这一次请求里出现。</span>
+              <span class="hint">{t('sites.tokenHint')}</span>
             </label>
 
             <div class="row">
-              <button type="button" class="btn btn--sm" onClick={() => void runCheck()}>检查连接</button>
+              <button type="button" class="btn btn--sm" onClick={() => void runCheck()}>{t('sites.check')}</button>
               {check && (
                 <span class={`mark mark--${check.looksLikeOnPaper ? 'ok' : 'warn'}`}>
-                  {check.looksLikeOnPaper ? '看起来是 OnPaper 站点' : '结构不完整'}
+                  {check.looksLikeOnPaper ? t('sites.checkOk') : t('sites.checkPartial')}
                 </span>
               )}
             </div>
 
             {check && (
               <dl class="checklist">
-                <div><dt>仓库文件</dt><dd>{check.repo.files} 个</dd></div>
-                <div><dt>令牌身份</dt><dd class="mono">{check.token.login ?? check.token.error}</dd></div>
-                <div><dt>配置</dt><dd>{check.structure.config ? '✓' : '✗'} src/config.ts</dd></div>
-                <div><dt>文章</dt><dd>{check.structure.posts ? '✓' : '✗'}</dd></div>
-                <div><dt>任务通道</dt><dd>{check.structure.taskWorkflow ? '✓ 已安装' : '✗ 未安装'}</dd></div>
+                <div><dt>{t('sites.repoFiles')}</dt><dd>{t('sites.fileCount', check.repo.files)}</dd></div>
+                <div><dt>{t('sites.tokenIdentity')}</dt><dd class="mono">{check.token.login ?? check.token.error}</dd></div>
+                <div><dt>{t('sites.structConfig')}</dt><dd>{check.structure.config ? '✓' : '✗'} src/config.ts</dd></div>
+                <div><dt>{t('sites.structPosts')}</dt><dd>{check.structure.posts ? '✓' : '✗'}</dd></div>
+                <div><dt>{t('sites.structChannel')}</dt><dd>{check.structure.taskWorkflow ? `✓ ${t('tasks.installed')}` : `✗ ${t('sites.channelMissing')}`}</dd></div>
               </dl>
             )}
           </div>

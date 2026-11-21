@@ -13,8 +13,10 @@ import type { AppContext } from '../app'
 import { PageHead } from '../app'
 import { SkeletonRows } from '../components/feedback'
 import { Empty, ErrorBox, Loading, formatDate, relativeTime } from '../components/ui'
+import { useT } from '../lib/i18n'
 
 export function AuditView({ ctx, siteId }: { ctx: AppContext, siteId: number }): ComponentChildren {
+  const { t } = useT()
   const [entries, setEntries] = useState<AuditEntry[] | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
@@ -38,27 +40,27 @@ export function AuditView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
   return (
     <div class="stack">
       <PageHead
-        title="审计"
-        description="面板里的每一次写入都记在这里。日志不含任何令牌。"
+        title={t('audit.title')}
+        description={t('audit.subtitle')}
       />
 
       {error && <ErrorBox error={error} />}
       {!entries && !error && <SkeletonRows rows={6} />}
 
       {entries && !entries.length ? (
-        <Empty title="还没有记录">做过一次修改之后，这里会出现第一条。</Empty>
+        <Empty title={t('audit.empty')}>{t('audit.emptyHint')}</Empty>
       ) : entries ? (
-        <div class="ledger ledger--list" role="table" aria-label="审计日志">
+        <div class="ledger ledger--list" role="table" aria-label={t('audit.title')}>
           <div class="ledger__head" role="row">
-            <span role="columnheader">时间</span>
-            <span role="columnheader">操作</span>
-            <span role="columnheader">对象</span>
-            <span role="columnheader">提交</span>
-            <span role="columnheader">人</span>
+            <span role="columnheader">{t('common.time')}</span>
+            <span role="columnheader">{t('audit.colAction')}</span>
+            <span role="columnheader">{t('audit.colTarget')}</span>
+            <span role="columnheader">{t('audit.colCommit')}</span>
+            <span role="columnheader">{t('audit.colWho')}</span>
           </div>
           {entries.map(entry => (
             <div key={entry.id} class="ledger__row ledger__row--static" role="row">
-              <span class="muted" role="cell" title={entry.created_at}>{relativeTime(entry.created_at)}</span>
+              <span class="muted" role="cell" title={entry.created_at}>{relativeTime(entry.created_at, t)}</span>
               <span class="mono" role="cell">{entry.action}</span>
               <span class="mono ledger__target" role="cell">{entry.target || '—'}</span>
               <span role="cell">
@@ -83,6 +85,7 @@ export function AuditView({ ctx, siteId }: { ctx: AppContext, siteId: number }):
 }
 
 export function HistoryView({ ctx, siteId }: { ctx: AppContext, siteId: number }): ComponentChildren {
+  const { t } = useT()
   const [commits, setCommits] = useState<CommitSummary[] | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
@@ -101,22 +104,22 @@ export function HistoryView({ ctx, siteId }: { ctx: AppContext, siteId: number }
   return (
     <div class="stack">
       <PageHead
-        title="提交"
-        description={`${ctx.site?.owner}/${ctx.site?.repo} · ${ctx.site?.branch} 上的最近提交，包括面板之外做的改动。`}
+        title={t('history.title')}
+        description={t('history.subtitle', ctx.site?.owner ?? '', ctx.site?.repo ?? '', ctx.site?.branch ?? '')}
       />
 
       {error && <ErrorBox error={error} />}
       {!commits && !error && <SkeletonRows rows={6} />}
 
       {commits && !commits.length ? (
-        <Empty title="没有提交" />
+        <Empty title={t('history.empty')} />
       ) : commits ? (
-        <div class="ledger ledger--list" role="table" aria-label="提交历史">
+        <div class="ledger ledger--list" role="table" aria-label={t('history.title')}>
           <div class="ledger__head" role="row">
-            <span role="columnheader">时间</span>
-            <span role="columnheader">说明</span>
+            <span role="columnheader">{t('common.time')}</span>
+            <span role="columnheader">{t('history.colMessage')}</span>
             <span role="columnheader">SHA</span>
-            <span role="columnheader">作者</span>
+            <span role="columnheader">{t('history.colAuthor')}</span>
           </div>
           {commits.map(commit => (
             <a
