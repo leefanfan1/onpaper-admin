@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# local Worker secrets — never commit
+.dev.vars
+.env
+.env.*
+
+# wrangler's local state (D1/KV emulation)
+.wrangler/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# local test artifacts
+screenshots/
+*.tmp
+friends-sample.md
+fc.md
+wf-check.yml
+preview-test.html
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!wrangler.jsonc
+!wrangler.dev.jsonc

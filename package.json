@@ -1,0 +1,40 @@
+{
+  "name": "onpaper-admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "管理面板：OnPaper 主题站点内容与配置的远程管理入口",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "db:local": "wrangler d1 execute onpaper-admin --local --file=./migrations/0001_init.sql",
+    "db:remote": "wrangler d1 execute onpaper-admin --remote --file=./migrations/0001_init.sql",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "acorn": "^8.14.0",
+    "hono": "^4.13.19"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261117.1",
+    "@codemirror/commands": "^6.7.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.10.8",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/highlight": "^1.2.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^22.10.5",
+    "codemirror": "^6.0.2",
+    "dompurify": "^3.2.3",
+    "katex": "^0.16.47",
+    "marked": "^15.0.6",
+    "mermaid": "^11.4.1",
+    "preact": "^10.25.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "wrangler": "^4.164.0"
+  }
+}

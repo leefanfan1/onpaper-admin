@@ -1,0 +1,47 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "onpaper-admin",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": "./dist/web",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // The Worker must see every request, not only /api/*: the security headers
+    // (CSP, frame-ancestors) are set in the Worker, and an asset served straight
+    // from the edge would ship without them. The cost is one Worker invocation
+    // per asset, which the free plan's 100k/day covers for a single admin.
+    "run_worker_first": true
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "your-team.cloudflareaccess.com",
+    "ACCESS_AUD": "PASTE_YOUR_AUD_TAG_HERE",
+    "PANEL_HOSTNAME": "admin.example.com",
+    "REQUIRE_ACCESS": "true"
+  },
+
+  "kv_namespaces": [
+    { "binding": "CACHE", "id": "PASTE_YOUR_CACHE_KV_ID" },
+    { "binding": "STORE", "id": "PASTE_YOUR_STORE_KV_ID" }
+  ],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "onpaper-admin",
+      "database_id": "PASTE_YOUR_D1_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "routes": [],
+
+  "upload_source_maps": true
+}

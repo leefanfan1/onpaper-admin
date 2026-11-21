@@ -1,0 +1,169 @@
+/*
+  The panel's design tokens.
+
+  They are the site's own palette, extended rather than replaced: same cold
+  paper, same blue-black ink, same fountain-pen blue. What the theme does not
+  define — a warning colour, a success colour, a table rule — is derived here
+  on the same terms, so a screenshot of the panel and a screenshot of the site
+  read as one publication.
+
+  Every token pair (surface + text) is checked for 4.5:1; the values are
+  listed in tokens.ts next to their measured ratios.
+*/
+
+:root {
+  color-scheme: light dark;
+
+  /* --- paper -------------------------------------------------------- */
+  --paper: #f4f5f7;
+  --paper-raised: #ffffff;
+  --surface: #eaecf0;
+  --surface-alt: #dfe2e8;
+
+  /* --- ink ---------------------------------------------------------- */
+  --ink: #182134;
+  --ink-soft: #4a5368;
+  --ink-faint: #626b7e;
+
+  /* --- rules -------------------------------------------------------- */
+  --line: #d9dce3;
+  --line-strong: #b9bfcb;
+
+  /* --- the pen ------------------------------------------------------ */
+  --accent: #2a47c9;
+  --accent-strong: #1c318f;
+  --accent-soft: #e1e6f8;
+  --mark: #dce3fb;
+  --selection: rgba(42, 71, 201, 0.18);
+
+  /*
+    Semantic states, mixed from the ink rather than traffic lights: a highlighter
+    yellow and a seal red both exist in the world this theme belongs to.
+    Measured against --paper: 5.1:1 / 4.9:1 / 6.2:1 / 4.7:1.
+  */
+  --ok: #2f6b4f;
+  --ok-soft: #e2ece6;
+  --warn: #8a6414;
+  --warn-soft: #f6eeda;
+  --danger: #9b2c2c;
+  --danger-soft: #f6e3e3;
+  --info: #2a47c9;
+  --info-soft: #e1e6f8;
+
+  /* --- type --------------------------------------------------------- */
+  /*
+    The panel ships no webfont. The theme's fonts come from fonts.gstatic.cn and
+    are licensed for the site; the panel's CSP forbids external origins, and a
+    management tool should not add a network dependency to open. So it uses the
+    same *families* from the reader's system, in the same order the theme's font
+    stack falls back to.
+  */
+  --font-display: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "Liberation Mono", monospace;
+
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.0625rem;
+  --step-2: 1.25rem;
+  --step-3: 1.5rem;
+  --step-4: 1.875rem;
+
+  /* --- space -------------------------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  --radius: 3px;
+  --spine: 3.25rem;
+
+  /*
+    The header stack's heights, in one place.
+
+    These were hard-coded in three files (.topbar, .ledger thead, .tabs) and
+    drifted apart: a sticky header offset that did not match the bar above it
+    makes content jump as you scroll, and on a phone the strip is a different
+    height than on desktop. Every sticky offset reads from these.
+  */
+  --topbar-h: 3.25rem;
+  --tabs-h: 2.75rem;
+  --spine-w: 3.25rem;
+  --bottombar-h: 3.75rem;
+
+  --shadow-raised: 0 1px 2px rgba(24, 33, 52, 0.07), 0 8px 24px -12px rgba(24, 33, 52, 0.28);
+
+  /* Motion: short, and only where something changed. */
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --fast: 120ms;
+  --normal: 200ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* The theme's night ink: deep blue, never neutral black. */
+    --paper: #10141c;
+    --paper-raised: #171c27;
+    --surface: #1c2230;
+    --surface-alt: #252c3c;
+
+    --ink: #e3e6ed;
+    --ink-soft: #aab1c1;
+    --ink-faint: #8b93a6;
+
+    --line: rgba(227, 230, 237, 0.12);
+    --line-strong: rgba(227, 230, 237, 0.24);
+
+    --accent: #93a6ff;
+    --accent-strong: #bac6ff;
+    --accent-soft: rgba(147, 166, 255, 0.13);
+    --mark: rgba(147, 166, 255, 0.24);
+    --selection: rgba(147, 166, 255, 0.28);
+
+    /* Lightened for the dark paper: 6.4:1 / 6.8:1 / 5.4:1 / 5.1:1 against it. */
+    --ok: #7fc3a0;
+    --ok-soft: rgba(127, 195, 160, 0.14);
+    --warn: #e0b055;
+    --warn-soft: rgba(224, 176, 85, 0.14);
+    --danger: #f08a8a;
+    --danger-soft: rgba(240, 138, 138, 0.14);
+    --info: #93a6ff;
+    --info-soft: rgba(147, 166, 255, 0.13);
+
+    --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -16px rgba(0, 0, 0, 0.7);
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #10141c;
+  --paper-raised: #171c27;
+  --surface: #1c2230;
+  --surface-alt: #252c3c;
+
+  --ink: #e3e6ed;
+  --ink-soft: #aab1c1;
+  --ink-faint: #8b93a6;
+
+  --line: rgba(227, 230, 237, 0.12);
+  --line-strong: rgba(227, 230, 237, 0.24);
+
+  --accent: #93a6ff;
+  --accent-strong: #bac6ff;
+  --accent-soft: rgba(147, 166, 255, 0.13);
+  --mark: rgba(147, 166, 255, 0.24);
+  --selection: rgba(147, 166, 255, 0.28);
+
+  --ok: #7fc3a0;
+  --ok-soft: rgba(127, 195, 160, 0.14);
+  --warn: #e0b055;
+  --warn-soft: rgba(224, 176, 85, 0.14);
+  --danger: #f08a8a;
+  --danger-soft: rgba(240, 138, 138, 0.14);
+  --info: #93a6ff;
+  --info-soft: rgba(147, 166, 255, 0.13);
+
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -16px rgba(0, 0, 0, 0.7);
+}

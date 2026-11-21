@@ -1,0 +1,612 @@
+/*
+  Phone and narrow-viewport overrides.
+
+  This file is loaded LAST. The rules here are the same specificity as the ones
+  in base.css and views.css, so load order is what decides — and while these
+  lived in base.css, every one of them was silently overridden by a later
+  stylesheet. That is why the phone layout looked like an unscaled desktop.
+*/
+
+/*
+  Phone layout.
+
+  This is the layout most of the panel's use happens in, so it is designed
+  rather than squeezed: the spine becomes one row, the tabs scroll horizontally
+  with the current one kept in view, controls are 44 px tall, and the sticky
+  bars collapse into a single header so the reading area keeps its height.
+*/
+@media (max-width: 720px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    /* Leave room for the bottom action bar where one exists. */
+    padding-block-end: env(safe-area-inset-bottom, 0);
+  }
+
+  .spine {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 20;
+    /* Fixed, not auto: an auto height let the flex column stretch to the
+       content on long pages, so the header grew and shrank per page. */
+    block-size: var(--topbar-h);
+    min-block-size: var(--topbar-h);
+    max-block-size: var(--topbar-h);
+    overflow: hidden;
+    flex-direction: row;
+    padding: var(--space-2) var(--space-4);
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--line);
+    background: var(--paper-raised);
+  }
+
+  .spine__title {
+    writing-mode: horizontal-tb;
+    letter-spacing: 0.12em;
+    font-size: var(--step-0);
+  }
+
+  .spine__actions {
+    display: flex;
+    gap: var(--space-1);
+  }
+
+  /* 44 px is the smallest comfortable touch target. */
+  .spine__btn {
+    inline-size: 2.75rem;
+    block-size: var(--tabs-h);
+    font-size: 1.1rem;
+  }
+
+  .topbar {
+    position: static;
+    block-size: auto;
+    min-block-size: 0;
+    padding: var(--space-2) var(--space-4);
+    background: none;
+    backdrop-filter: none;
+    border-block-end: 0;
+    /* The spine below already carries the site name on a phone. */
+    display: none;
+  }
+
+  .tabs {
+    position: sticky;
+    inset-block-start: var(--topbar-h);
+    z-index: 15;
+    background: var(--paper);
+    block-size: var(--tabs-h);
+    min-block-size: var(--tabs-h);
+    padding-inline: var(--space-2);
+    /* Fade the right edge so it reads as scrollable. */
+    mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+  }
+
+  .tab {
+    min-block-size: var(--tabs-h);
+    padding-inline: var(--space-3);
+    font-size: var(--step--1);
+  }
+
+  .content {
+    padding: var(--space-3) var(--space-4) var(--space-7);
+  }
+
+  /* Page heads stack, and their actions go full width where they matter. */
+  .pagehead {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    padding-block-end: var(--space-3);
+  }
+
+  .pagehead__title { font-size: var(--step-2); }
+
+  .pagehead__actions .row {
+    inline-size: 100%;
+    flex-wrap: wrap;
+  }
+
+  .pagehead__actions .btn { flex: 1 1 auto; }
+
+  /* Every button grows to a thumb-sized target. */
+  .btn {
+    min-block-size: var(--tabs-h);
+    padding-inline: var(--space-4);
+  }
+
+  .btn--sm {
+    min-block-size: 2.25rem;
+  }
+
+  .toolbar {
+    gap: var(--space-2);
+  }
+
+  .toolbar__search,
+  .toolbar .select,
+  .toolbar .btn {
+    flex: 1 1 100%;
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  /* A select and its button sit side by side rather than stacking twice. */
+  .toolbar .select { flex: 1 1 8rem; }
+
+  .bulkbar {
+    position: sticky;
+    inset-block-end: 0;
+    z-index: 12;
+    margin-inline: calc(-1 * var(--space-4));
+    border-radius: 0;
+    border-inline: 0;
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .subtabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-inline: calc(-1 * var(--space-4));
+    padding-inline: var(--space-3);
+  }
+
+  .subtabs::-webkit-scrollbar { display: none; }
+
+  /* Dialogs become sheets: full width, anchored to the bottom, scrolling
+     inside. A centred 34rem dialog on a 390px screen is mostly backdrop. */
+  .modal {
+    inline-size: 100vw;
+    max-inline-size: 100vw;
+    margin: 0;
+    margin-block-start: auto;
+    border-radius: var(--radius) var(--radius) 0 0;
+    border-inline: 0;
+    border-block-end: 0;
+    max-block-size: 92dvh;
+  }
+
+  .modal__body {
+    padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom, 0));
+  }
+
+  .modal__content { max-block-size: 70dvh; }
+
+  .modal__actions {
+    position: sticky;
+    inset-block-end: 0;
+    background: var(--paper-raised);
+    padding-block: var(--space-3);
+  }
+
+  .modal__actions .btn { flex: 1 1 auto; }
+
+  /* Toasts sit above the safe area and span the width. */
+  .toasts {
+    inset-inline: var(--space-3);
+    inset-block-end: calc(var(--space-3) + env(safe-area-inset-bottom, 0));
+    max-inline-size: none;
+  }
+
+  /* The ledger gives up its secondary columns before it gives up legibility. */
+  .ledger thead th:nth-child(4),
+  .ledger tbody td:nth-child(4),
+  .ledger thead th:nth-child(5),
+  .ledger tbody td:nth-child(5) {
+    display: none;
+  }
+
+  .ledger tbody th,
+  .ledger tbody td {
+    padding: var(--space-3) var(--space-2);
+  }
+
+  .ledger__title { min-inline-size: 0; }
+
+  .ledger--list .ledger__head,
+  .ledger--list .ledger__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2);
+  }
+
+  .ledger--list .ledger__head span:nth-child(3),
+  .ledger--list .ledger__head span:nth-child(4),
+  .ledger--list .ledger__row > *:nth-child(3),
+  .ledger--list .ledger__row > *:nth-child(4) {
+    display: none;
+  }
+
+  /* The editor is one pane at a time; its tab strip is already in the markup. */
+  .editor__panes { min-block-size: 24rem; }
+  .preview-frame,
+  .editor__pane--write .cm-editor { min-block-size: 24rem; max-block-size: 60dvh; }
+
+  .shelf-grid { grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: var(--space-4) var(--space-3); }
+  .media-grid { grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); }
+
+  .friend-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .friend-row__order {
+    grid-auto-flow: column;
+    justify-content: start;
+  }
+
+  .palettes { grid-template-columns: minmax(0, 1fr); }
+
+  .palette-row { grid-template-columns: 2rem minmax(0, 1fr); }
+  .palette-row__name { display: none; }
+}
+
+/* Very narrow phones: drop the optional columns entirely. */
+@media (max-width: 420px) {
+  .pagehead__desc { display: none; }
+  .ledger__date { display: none; }
+  .ledger thead th:nth-child(3) { display: none; }
+  .shelf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------------------------------------------------------------------------
+   Phone: a fixed bottom bar, and no second scroll region.
+
+   The panel used to stack a spine, a top bar and a tab strip above the content
+   on a phone — three bands of chrome on a 660px-tall screen, two of them
+   sticky, each with its own height. That is what made the header appear to
+   change height between pages: the bands were sized independently.
+
+   Below 720px there is now one fixed bar at the bottom and one scrolling
+   region. Nothing else is sticky.
+   ------------------------------------------------------------------------- */
+
+.bottombar {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .bottombar {
+    position: fixed;
+    inset-block-end: 0;
+    inset-inline: 0;
+    z-index: 30;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    block-size: var(--bottombar-h);
+    padding-block-end: env(safe-area-inset-bottom, 0);
+    border-block-start: 1px solid var(--line);
+    /* Solid, not translucent with a backdrop blur: a blur creates a containing
+       block, and a  descendant then anchors to this element
+       instead of the viewport — the bar ended up floating mid-page on long
+       screens. A solid bar needs no blur and cannot make that mistake. */
+    background: var(--paper-raised);
+    box-shadow: 0 -1px 0 var(--line), 0 -8px 24px -16px rgba(24, 33, 52, 0.28);
+  }
+
+  .bottombar__item {
+    display: grid;
+    place-content: center;
+    gap: 0.1rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-faint);
+    font-size: 0.7rem;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .bottombar__item[aria-current="page"] {
+    color: var(--accent);
+  }
+
+  .bottombar__glyph {
+    font-size: 1.1rem;
+    line-height: 1;
+    justify-self: center;
+  }
+
+  .bottombar__label { justify-self: center; }
+
+  /* The desktop strip is gone on a phone; the bar replaces it. */
+  .tabs { display: none; }
+
+  /* One scrolling region: no sticky headers to disagree with each other. */
+  .ledger thead th { position: static; }
+
+  /* Leave room for the bar, plus the home indicator. */
+  .content {
+    padding-block-end: calc(var(--bottombar-h) + env(safe-area-inset-bottom, 0) + var(--space-5));
+  }
+
+  /* A sticky action row would collide with the bar, so it sits above it. */
+  .bulkbar {
+    inset-block-end: calc(var(--bottombar-h) + env(safe-area-inset-bottom, 0));
+  }
+
+  .toasts {
+    inset-block-end: calc(var(--bottombar-h) + env(safe-area-inset-bottom, 0) + var(--space-2));
+  }
+}
+
+/* The 更多 sheet --------------------------------------------------------- */
+
+.sheet {
+  margin: 0;
+  margin-block-start: auto;
+  inline-size: 100vw;
+  max-inline-size: 100vw;
+  max-block-size: 85dvh;
+  padding: 0;
+  border: 0;
+  border-radius: var(--space-4) var(--space-4) 0 0;
+  background: var(--paper-raised);
+  color: var(--ink);
+  box-shadow: var(--shadow-raised);
+}
+
+.sheet::backdrop {
+  background: rgba(16, 20, 28, 0.45);
+}
+
+.sheet__body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom, 0));
+  overflow: auto;
+}
+
+.sheet__grab {
+  justify-self: center;
+  inline-size: 2.5rem;
+  block-size: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.sheet__title {
+  font-size: var(--step-1);
+}
+
+.sheet__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.sheet__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: 3rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.sheet__item:hover,
+.sheet__item[aria-current="page"] {
+  background: var(--surface);
+}
+
+.sheet__glyph {
+  inline-size: 1.5rem;
+  text-align: center;
+  color: var(--ink-faint);
+}
+
+.sheet__item .mark { margin-inline-start: auto; }
+
+.sheet__close { inline-size: 100%; }
+
+
+/* ---------------------------------------------------------------------------
+   Containment.
+
+   A phone cannot scroll sideways through a page and still feel like an app, so
+   nothing may be wider than the viewport. Tables are the usual culprit: their
+   intrinsic width is the sum of their columns, and a grid or flex parent
+   happily passes that width up. Each level is therefore told it may shrink, and
+   the table itself scrolls in its own box.
+   ------------------------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  html, body {
+    max-inline-size: 100%;
+    overflow-x: hidden;
+  }
+
+  .shell,
+  .main,
+  .content,
+  .stack,
+  .pagehead,
+  .toolbar,
+  .ledger,
+  .card,
+  .shelf-grid,
+  .media-grid {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
+
+  .row {
+    flex-wrap: wrap;
+    min-inline-size: 0;
+  }
+
+  .row > * { min-inline-size: 0; }
+
+  /* Tables scroll inside themselves rather than widening the page. */
+  .ledger {
+    display: block;
+    inline-size: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ledger table,
+  table.ledger {
+    inline-size: 100%;
+  }
+
+  /* The editor's two panes and the dialogs already fit; this catches the
+     remaining wide children (long code lines, preformatted diff text). */
+  pre, code, .diff__text, .mono {
+    overflow-wrap: anywhere;
+  }
+
+  .diff__lines { max-inline-size: 100%; }
+}
+
+/* ---------------------------------------------------------------------------
+   The post ledger on a phone.
+
+   A five-column table does not fit 390px, and the first attempt — rebuilding it
+   as a card with grid areas — turned out to be worse: three overlapping
+   attempts at placing the date and the count showed how fragile that is. So the
+   table stays a table, and the two columns that are decoration on a phone (word
+   count, status) give way. The title is allowed to wrap, which is what keeps it
+   from being clipped.
+   ------------------------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  .ledger {
+    display: block;
+    overflow: visible;
+    border-block-start: 0;
+  }
+
+  .ledger thead { display: none; }
+
+  .ledger tbody { display: block; }
+
+  .ledger tbody tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 0.2rem var(--space-3);
+    padding: var(--space-3) var(--space-1);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .ledger tbody td,
+  .ledger tbody th {
+    display: block;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+    overflow: visible;
+  }
+
+  .ledger tbody td.ledger__check,
+  .ledger tbody th.ledger__check {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: start;
+    padding-block-start: 0.2rem !important;
+    text-align: start !important;
+  }
+
+  .ledger tbody th.ledger__title {
+    grid-column: 2;
+    grid-row: 1;
+    min-inline-size: 0;
+  }
+
+  .ledger tbody td.ledger__state {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+  }
+
+  /* Date under the title, on the left. */
+  .ledger tbody td.ledger__date {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+  }
+
+  /* The word count is useful but secondary; on a phone it sits after the date
+     on the same line rather than in a column of its own. */
+  .ledger tbody td.ledger__words {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    text-align: end !important;
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+
+  .ledger tbody td.ledger__words::after { content: ' 字'; opacity: 0.8; }
+
+  .ledger__link {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: var(--step-0);
+    line-height: 1.5;
+  }
+
+  .ledger__desc {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    margin-block-start: 0.1rem;
+  }
+
+  /* Layout-only ledgers (audit, history, users) keep their grid form. */
+  .ledger--list { display: block !important; overflow: visible !important; }
+  .ledger--list .ledger__head { display: none; }
+}
+
+/* The shelf on a phone.
+
+   A 2:3 poster in a two-column grid is 160px wide and 240px tall — half the
+   screen for one book. The covers are the point of the shelf, but they are not
+   the whole screen: three columns keeps a row of three visible above the fold
+   and the title still fits. */
+@media (max-width: 720px) {
+  .shelf-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4) var(--space-3);
+  }
+
+  .shelf-card__title { font-size: var(--step--1); }
+  .shelf-card__meta { font-size: 0.75rem; }
+  .shelf-card__note { display: none; }
+
+  /* The per-card actions are editing controls, not reading material; they
+     collapse to one row under the title instead of three stacked buttons. */
+  .shelf-card__actions {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+
+  .shelf-card__actions .btn {
+    min-block-size: 2rem;
+    padding-inline: var(--space-2);
+    font-size: 0.75rem;
+  }
+
+  /* A broken cover shows the browser's broken-image icon, which looks like a
+     bug. The placeholder behind it gives it something to be. */
+  .shelf-card__cover {
+    background: var(--surface);
+    position: relative;
+  }
+
+  .sheet {
+    max-block-size: 80dvh;
+  }
+}
